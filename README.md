@@ -11,7 +11,3 @@ RustyRPC distinguishes itself by defining schemas in code, avoiding a separate c
  - **Encoding Format Agnostic**: Choose any format, such as JSON, Cap'n Proto, or rkyv (currently only rkyv is supported).
 
  - **Object-Oriented**: You can return a service from a function of a service!
-
-## License
-
-This crate is licensed under the [MIT License](LICENSE).
