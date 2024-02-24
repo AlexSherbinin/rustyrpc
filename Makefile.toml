@@ -1,0 +1,6 @@
+[tasks.post-ci-flow]
+dependencies = ["deny"]
+
+[tasks.deny]
+command = "cargo-deny"
+args = ["check"]

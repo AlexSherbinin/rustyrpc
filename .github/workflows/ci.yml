@@ -1,0 +1,17 @@
+name: CI
+on: [push]
+jobs:
+    flow:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: dtolnay/rust-toolchain@master
+              with:
+                toolchain: nightly-2024-01-07
+            - name: Install cargo-binstall
+              run: curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+            - name: Install cargo-make
+              run: cargo binstall cargo-make --no-confirm
+            - run: cargo binstall cargo-deny --no-confirm  
+            - name: Run CI flow
+              run: cargo make ci-flow 
