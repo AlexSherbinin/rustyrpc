@@ -51,8 +51,7 @@ where
         loop {
             let connection = self.accept_connection().await.unwrap();
             self.tasks
-                .spawn_task(Arc::clone(&self).handle_connection(connection))
-                .await;
+                .spawn_task(Arc::clone(&self).handle_connection(connection));
         }
     }
 
@@ -83,11 +82,9 @@ where
             let call_stream = connection.accept_call_stream().await.unwrap();
             let call_handler = call_handler.clone();
 
-            self.tasks
-                .spawn_task(async move {
-                    call_stream.handle_call(call_handler).await.unwrap();
-                })
-                .await;
+            self.tasks.spawn_task(async move {
+                call_stream.handle_call(call_handler).await.unwrap();
+            });
         }
     }
 }
