@@ -16,8 +16,6 @@ impl TaskPool {
 
 impl Drop for TaskPool {
     fn drop(&mut self) {
-        core::mem::replace(&mut self.0, FuturesUnordered::new())
-            .into_iter()
-            .for_each(|future| future.abort());
+        self.0.iter().for_each(tokio::task::JoinHandle::abort);
     }
 }
