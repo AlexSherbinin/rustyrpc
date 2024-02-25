@@ -39,7 +39,8 @@
     clippy::infinite_loop, // Allowed because of bug: https://github.com/rust-lang/rust-clippy/issues/12338
     clippy::unseparated_literal_suffix,
     clippy::self_named_module_files,
-    clippy::big_endian_bytes
+    clippy::big_endian_bytes,
+    clippy::single_call_fn
 )]
 #![forbid(unreachable_pub, missing_docs)]
 #![doc = include_str!("../../README.md")]
