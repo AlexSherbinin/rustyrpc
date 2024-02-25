@@ -1,8 +1,7 @@
 use alloc::sync::Arc;
 use core::marker::PhantomData;
-
-use futures::lock::Mutex;
-use log::warn;
+use core::ops::DerefMut;
+use tokio::sync::Mutex;
 
 use crate::{
     error::{ServiceCallError, ServiceRequestError},
@@ -10,19 +9,19 @@ use crate::{
     protocol::{RequestKind, ServiceCallRequestResult, ServiceIdRequestResult, ServiceKind},
     service::ServiceClient,
     transport::{self, Stream, StreamExt},
+    utils::{ConnectionCloseOnDrop, DropOwned},
 };
 
 /// RPC client for calling remote services.
 pub struct Client<Connection: transport::Connection, Format: format::EncodingFormat> {
-    connection: Mutex<Connection>,
-    not_closed_warn: ClientNotClosedWarn,
+    connection: Mutex<DropOwned<ConnectionCloseOnDrop<Connection>>>,
     _format: PhantomData<Format>,
 }
 
 impl<Connection: transport::Connection, Format: format::EncodingFormat> Client<Connection, Format> {
     async fn open_new_stream(&self) -> Result<Connection::Stream, Connection::Error> {
         let mut transport_connection = self.connection.lock().await;
-        transport_connection.new_stream().await
+        transport_connection.deref_mut().0.new_stream().await
     }
 
     /// Retrieves a service specified by service client.
@@ -131,16 +130,6 @@ impl<Connection: transport::Connection, Format: format::EncodingFormat> Client<C
             .map_err(ServiceCallError::StreamIO)?;
         Ok(result)
     }
-
-    /// Closes underlying connection
-    ///
-    /// # Errors
-    /// Returns an error if underlying connection returned error while close.
-    pub async fn close(self) -> Result<(), Connection::Error> {
-        self.connection.into_inner().close().await?;
-        self.not_closed_warn.defuse();
-        Ok(())
-    }
 }
 
 impl<Connection: transport::Connection, Format: EncodingFormat> From<Connection>
@@ -148,26 +137,8 @@ impl<Connection: transport::Connection, Format: EncodingFormat> From<Connection>
 {
     fn from(connection: Connection) -> Self {
         Self {
-            connection: connection.into(),
-            not_closed_warn: ClientNotClosedWarn::default(),
+            connection: Mutex::new(ConnectionCloseOnDrop(connection).into()),
             _format: PhantomData,
-        }
-    }
-}
-
-#[derive(Default)]
-struct ClientNotClosedWarn(bool);
-
-impl ClientNotClosedWarn {
-    fn defuse(mut self) {
-        self.0 = true;
-    }
-}
-
-impl Drop for ClientNotClosedWarn {
-    fn drop(&mut self) {
-        if !self.0 {
-            warn!("Client is dropped but not closed asynchronously");
         }
     }
 }

@@ -45,7 +45,7 @@ impl<T: Stream> T {
 }
 
 /// Transport specific incoming connection.
-pub trait Connection: Send {
+pub trait Connection: Send + 'static {
     /// Stream produced by connection.
     type Stream: Stream + 'static;
     /// Error that can occur while any operation on connection.
