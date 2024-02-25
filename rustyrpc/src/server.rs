@@ -1,24 +1,22 @@
 mod builder;
+mod call_handler;
 mod call_stream;
 mod client_connection;
 mod private_service;
 mod task_pool;
 
-use self::{call_stream::CallHandler, client_connection::ClientConnection, task_pool::TaskPool};
+use self::{client_connection::ClientConnection, task_pool::TaskPool};
 use crate::{
     format::{
         DecodeZeroCopy, DecodeZeroCopyFallible, Encode, EncodingFormat, ZeroCopyEncodingFormat,
     },
-    protocol::{
-        RemoteServiceIdRequestError, RequestKind, ServiceCallRequestError,
-        ServiceCallRequestResult, ServiceIdRequestResult, ServiceKind,
-    },
+    protocol::{RequestKind, ServiceCallRequestResult, ServiceIdRequestResult},
+    server::call_handler::ServerCallHandler,
     service::Service,
     transport,
 };
 use alloc::sync::Arc;
 use core::marker::PhantomData;
-use derive_where::derive_where;
 use futures::lock::Mutex;
 use log::trace;
 use std::collections::HashMap;
@@ -73,10 +71,7 @@ where
     ) {
         trace!("New connection accepted");
 
-        let call_handler = ServerCallHandler {
-            server: Arc::clone(&self),
-            private_service_allocator: Arc::default(),
-        };
+        let call_handler = ServerCallHandler::new_for_connection(Arc::clone(&self));
 
         loop {
             let call_stream = connection.accept_call_stream().await.unwrap();
@@ -85,76 +80,6 @@ where
             self.tasks.spawn_task(async move {
                 call_stream.handle_call(call_handler).await.unwrap();
             });
-        }
-    }
-}
-
-#[derive_where(Clone)]
-struct ServerCallHandler<Listener: transport::ConnectionListener, Format: EncodingFormat> {
-    server: Arc<Server<Listener, Format>>,
-    private_service_allocator: Arc<PrivateServiceAllocator<Format>>,
-}
-
-impl<Listener: transport::ConnectionListener, Format: EncodingFormat> CallHandler
-    for ServerCallHandler<Listener, Format>
-{
-    async fn handle_call(
-        self,
-        kind: ServiceKind,
-        service_id: u32,
-        function_id: u32,
-        args: Vec<u8>,
-    ) -> Result<Vec<u8>, ServiceCallRequestError> {
-        trace!("Received service call. Kind: {kind:?}, service id: {service_id}, function_id: {function_id}");
-
-        #[allow(clippy::map_err_ignore)]
-        let service_id: usize = service_id
-            .try_into()
-            .map_err(|_| ServiceCallRequestError::InvalidServiceId)?;
-
-        match kind {
-            ServiceKind::Public if let Some(service) = self.server.services.get(service_id) => {
-                service
-                    .call(
-                        Arc::clone(&self.private_service_allocator),
-                        function_id,
-                        args,
-                    )
-                    .await
-            }
-            ServiceKind::Private
-                if let Some(service) = self.private_service_allocator.get(service_id).await =>
-            {
-                service
-                    .call(
-                        Arc::clone(&self.private_service_allocator),
-                        function_id,
-                        args,
-                    )
-                    .await
-            }
-            ServiceKind::Public | ServiceKind::Private => {
-                Err(ServiceCallRequestError::InvalidServiceId)
-            }
-        }
-    }
-
-    async fn handle_service_request(
-        self,
-        name: &str,
-        checksum: &[u8],
-    ) -> Result<u32, RemoteServiceIdRequestError> {
-        trace!("Received service request. Service name: {name}, checksum: {checksum:?}");
-
-        let (expected_checksum, service_id) = self
-            .server
-            .service_map
-            .get(name)
-            .ok_or(RemoteServiceIdRequestError::ServiceNotFound)?;
-        if checksum == &**expected_checksum {
-            Ok(*service_id)
-        } else {
-            Err(RemoteServiceIdRequestError::InvalidChecksum)
         }
     }
 }
