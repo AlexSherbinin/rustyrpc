@@ -4,7 +4,7 @@ mod service_ref;
 use crate::{format::EncodingFormat, service::Service};
 use core::ops::Deref;
 use derive_where::derive_where;
-use tokio::sync::{RwLock, RwLockReadGuard};
+use tokio::sync::{Mutex, RwLock, RwLockReadGuard};
 
 pub use allocator::PrivateServiceAllocator;
 pub use service_ref::ServiceRef;
@@ -25,12 +25,12 @@ impl<Format: EncodingFormat> Deref for ServiceRefLock<'_, Format> {
 #[derive_where(Default)]
 pub(super) struct PrivateServices<Format: EncodingFormat> {
     services: boxcar::Vec<RwLock<Option<Box<dyn Service<Format>>>>>,
-    free_ids: RwLock<Vec<usize>>,
+    free_ids: Mutex<Vec<usize>>,
 }
 
 impl<Format: EncodingFormat> PrivateServices<Format> {
     pub(super) async fn push(&self, service: Box<dyn Service<Format>>) -> usize {
-        if let Some(service_id) = self.free_ids.write().await.pop() {
+        if let Some(service_id) = self.free_ids.lock().await.pop() {
             #[allow(clippy::unwrap_used)]
             let mut service_entry = self.services.get(service_id).unwrap().write().await;
             *service_entry = Some(service);
@@ -52,7 +52,7 @@ impl<Format: EncodingFormat> PrivateServices<Format> {
         let mut service_entry = self.services.get(id)?.write().await;
 
         if service_entry.is_some() {
-            self.free_ids.write().await.push(id);
+            self.free_ids.lock().await.push(id);
         }
 
         service_entry.take()
