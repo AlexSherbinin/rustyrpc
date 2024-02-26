@@ -6,6 +6,7 @@ use quinn::{
     ClientConfig, ConnectError, ConnectionError, Endpoint, RecvStream, SendStream, StoppedError,
     VarInt,
 };
+use std::io;
 
 pub use listener::ConnectionListener;
 use thiserror::Error;
@@ -30,9 +31,7 @@ pub struct SendingInvalidLengthPrefixError(#[from] TryFromIntError);
 pub struct InvalidLengthPrefixReceivedError(#[from] TryFromIntError);
 
 impl super::Stream for Stream {
-    type Error = std::io::Error;
-
-    async fn send(&mut self, message: Vec<u8>) -> Result<(), Self::Error> {
+    async fn send(&mut self, message: Vec<u8>) -> io::Result<()> {
         let length_prefix: u32 = message.len().try_into().map_err(|err| {
             std::io::Error::new(
                 std::io::ErrorKind::Other,
@@ -49,7 +48,7 @@ impl super::Stream for Stream {
         Ok(())
     }
 
-    async fn receive(&mut self) -> Result<Vec<u8>, Self::Error> {
+    async fn receive(&mut self) -> io::Result<Vec<u8>> {
         let mut length_prefix_buffer = [0u8; 4];
         AsyncReadExt::read_exact(&mut self.receive_stream, &mut length_prefix_buffer).await?;
         let length_prefix: usize = u32::from_be_bytes(length_prefix_buffer)
@@ -67,7 +66,7 @@ impl super::Stream for Stream {
         Ok(message_buffer)
     }
 
-    async fn stopped(mut self) -> Result<(), Self::Error> {
+    async fn stopped(mut self) -> io::Result<()> {
         if let Err(err) = self.send_stream.stopped().await {
             match err {
                 StoppedError::ConnectionLost(err) => Err(err.into()),
@@ -80,16 +79,15 @@ impl super::Stream for Stream {
         }
     }
 
-    async fn close(mut self) -> Result<(), Self::Error> {
+    async fn close(mut self) -> io::Result<()> {
         self.send_stream.close().await
     }
 }
 
 impl super::Connection for Connection {
     type Stream = Stream;
-    type Error = std::io::Error;
 
-    async fn new_stream(&mut self) -> Result<Self::Stream, Self::Error> {
+    async fn new_stream(&mut self) -> io::Result<Self::Stream> {
         let (send_stream, receive_stream) = self.0.open_bi().await?;
         Ok(Stream {
             send_stream,
@@ -97,7 +95,7 @@ impl super::Connection for Connection {
         })
     }
 
-    async fn accept_stream(&mut self) -> Result<Self::Stream, Self::Error> {
+    async fn accept_stream(&mut self) -> io::Result<Self::Stream> {
         let (send_stream, receive_stream) = self.0.accept_bi().await?;
         Ok(Stream {
             send_stream,
@@ -105,7 +103,7 @@ impl super::Connection for Connection {
         })
     }
 
-    async fn close(self) -> Result<(), Self::Error> {
+    async fn close(self) -> io::Result<()> {
         self.0.close(VarInt::from_u32(0), b"Client is closed");
         Ok(())
     }

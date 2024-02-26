@@ -16,6 +16,8 @@
 //! **Client closes stream**
 //! ```
 
+use std::io;
+
 use thiserror::Error;
 
 /// Response on service id request
@@ -69,6 +71,17 @@ pub enum RemoteServiceIdRequestError {
     InvalidChecksum,
 }
 
+impl From<RemoteServiceIdRequestError> for io::Error {
+    fn from(error: RemoteServiceIdRequestError) -> Self {
+        let kind = match error {
+            RemoteServiceIdRequestError::ServiceNotFound => io::ErrorKind::NotFound,
+            RemoteServiceIdRequestError::InvalidChecksum => io::ErrorKind::InvalidInput,
+        };
+
+        io::Error::new(kind, error)
+    }
+}
+
 /// Errors that may occur on remote host while executing service call.
 #[derive(Debug, Error)]
 pub enum ServiceCallRequestError {
@@ -81,7 +94,19 @@ pub enum ServiceCallRequestError {
     /// Indicates a failure in decoding the function arguments.
     #[error("Failed to decode args")]
     ArgsDecode,
-    /// Indicates a failure in encoding the value returned by the function.
-    #[error("Failed to encode what function returned")]
-    ReturnsEncode,
+    /// Indicates a failure caused by internal server errors.
+    #[error("Unexpected error caused by server")]
+    ServerInternal,
+}
+
+impl From<ServiceCallRequestError> for io::Error {
+    fn from(error: ServiceCallRequestError) -> Self {
+        let kind = if let ServiceCallRequestError::ServerInternal = error {
+            io::ErrorKind::Other
+        } else {
+            io::ErrorKind::InvalidInput
+        };
+
+        io::Error::new(kind, error)
+    }
 }

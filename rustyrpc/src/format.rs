@@ -11,7 +11,7 @@ pub trait ZeroCopyEncodingFormat: EncodingFormat {}
 /// A data structure that can be encoded into a specified format.
 pub trait Encode<Format: EncodingFormat> {
     /// Encoding error
-    type Error: std::error::Error + 'static;
+    type Error: std::error::Error + Send + Sync + 'static;
 
     /// Encodes data structure into specified format
     ///
@@ -27,7 +27,7 @@ where
     Self: Sized,
 {
     /// Decoding error
-    type Error: std::error::Error + 'static;
+    type Error: std::error::Error + Send + Sync + 'static;
 
     /// Decodes data structure from specified format
     ///
@@ -52,5 +52,5 @@ where
 /// A data structure that can fail while zero-copy deserialization
 pub trait DecodeZeroCopyFallible<Format: ZeroCopyEncodingFormat> {
     /// An error that can occur while zero-copy decoding from specified format
-    type Error: std::error::Error + 'static;
+    type Error: std::error::Error + Send + Sync + 'static;
 }

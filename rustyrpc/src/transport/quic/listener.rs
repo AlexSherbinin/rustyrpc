@@ -1,31 +1,22 @@
 use core::net::SocketAddr;
+use std::io;
 
-use quinn::{ConnectionError, Endpoint, ServerConfig};
-use thiserror::Error;
+use quinn::{Endpoint, ServerConfig};
 
 use super::Connection;
-
-#[derive(Error, Debug)]
-pub enum AcceptError {
-    #[error("Endpoint is closed")]
-    EndpointIsClosed,
-    #[error(transparent)]
-    Connection(#[from] ConnectionError),
-}
 
 /// Listener for incoming connections via QUIC protocol.
 pub struct ConnectionListener(quinn::Endpoint);
 
 impl crate::transport::ConnectionListener for ConnectionListener {
     type Connection = Connection;
-    type Error = AcceptError;
 
-    async fn accept_connection(&mut self) -> Result<Self::Connection, Self::Error> {
+    async fn accept_connection(&mut self) -> io::Result<Self::Connection> {
         Ok(self
             .0
             .accept()
             .await
-            .ok_or(AcceptError::EndpointIsClosed)?
+            .ok_or_else(|| io::Error::new(io::ErrorKind::NotConnected, "Endpoint is closed"))?
             .await
             .map(Connection)?)
     }

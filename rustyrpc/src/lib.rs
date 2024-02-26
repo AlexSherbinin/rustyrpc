@@ -49,8 +49,6 @@ extern crate alloc;
 
 /// Provides functionality for client side of RPC.
 pub mod client;
-/// Errors that may occur while usage of RPC.
-pub mod error;
 /// Provides abstraction layer against encoding format.
 pub mod format;
 /// Provides core primitives for RPC protocol.

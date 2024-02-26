@@ -1,10 +1,10 @@
 use alloc::sync::Arc;
 use core::marker::PhantomData;
 use core::ops::DerefMut;
+use std::io;
 use tokio::sync::Mutex;
 
 use crate::{
-    error::{ServiceCallError, ServiceRequestError},
     format::{self, Decode, Encode, EncodingFormat},
     protocol::{RequestKind, ServiceCallRequestResult, ServiceIdRequestResult, ServiceKind},
     service::ServiceClient,
@@ -19,7 +19,7 @@ pub struct Client<Connection: transport::Connection, Format: format::EncodingFor
 }
 
 impl<Connection: transport::Connection, Format: format::EncodingFormat> Client<Connection, Format> {
-    async fn open_new_stream(&self) -> Result<Connection::Stream, Connection::Error> {
+    async fn open_new_stream(&self) -> io::Result<Connection::Stream> {
         let mut transport_connection = self.connection.lock().await;
         transport_connection.deref_mut().0.new_stream().await
     }
@@ -28,54 +28,41 @@ impl<Connection: transport::Connection, Format: format::EncodingFormat> Client<C
     ///
     /// # Errors
     /// Returns an error if service request fails.
-    pub async fn get_service_client<T>(
-        self: Arc<Self>,
-    ) -> Result<T, ServiceRequestError<'static, Connection, Format>>
+    pub async fn get_service_client<T>(self: Arc<Self>) -> io::Result<T>
     where
         for<'b> RequestKind<'b>: Encode<Format>,
         ServiceIdRequestResult: Decode<Format>,
         T: ServiceClient<Connection, Format>,
     {
-        self.request_service(T::SERVICE_NAME, T::SERVICE_CHECKSUM)
-            .await
-            .map(|service_id| T::new(ServiceKind::Public, service_id, self))
+        let service_id = self
+            .request_service(T::SERVICE_NAME, T::SERVICE_CHECKSUM)
+            .await?;
+        let service_id = service_id
+            .try_into()
+            .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))?;
+
+        Ok(T::new(ServiceKind::Public, service_id, self))
     }
 
     /// Retrieves a service. It's different from [`get_service_client`][Client::get_service_client], because just returns received service id except client
     ///
     /// # Errors
     /// Returns an error if service request fails.
-    pub async fn request_service<'a>(
-        &self,
-        name: &'a str,
-        checksum: &'a [u8],
-    ) -> Result<usize, ServiceRequestError<'a, Connection, Format>>
+    pub async fn request_service<'a>(&self, name: &'a str, checksum: &'a [u8]) -> io::Result<u32>
     where
         for<'b> RequestKind<'b>: Encode<Format>,
         ServiceIdRequestResult: Decode<Format>,
     {
-        let mut request_stream = self
-            .open_new_stream()
-            .await
-            .map_err(ServiceRequestError::StreamManagement)?;
+        let mut request_stream = self.open_new_stream().await?;
 
         let request = RequestKind::ServiceId { name, checksum };
-        request_stream
-            .send_encodable(&request)
-            .await
-            .map_err(ServiceRequestError::RequestEncode)?;
+        request_stream.send_encodable(&request).await?;
 
         let service_id = request_stream
             .receive_decodable::<ServiceIdRequestResult, _>()
-            .await??
-            .0;
-        request_stream
-            .close()
-            .await
-            .map_err(ServiceRequestError::StreamIO)?;
-        service_id
-            .try_into()
-            .map_err(ServiceRequestError::InvalidServiceId)
+            .await??;
+        request_stream.close().await?;
+        Ok(service_id.0)
     }
 
     /// Calls a remote service.
@@ -88,46 +75,29 @@ impl<Connection: transport::Connection, Format: format::EncodingFormat> Client<C
         id: u32,
         function_id: u32,
         args: &Args,
-    ) -> Result<Returns, ServiceCallError<Connection, Format, Args, Returns>>
+    ) -> io::Result<Returns>
     where
         RequestKind<'static>: Encode<Format>,
         Args: Encode<Format>,
         Returns: Decode<Format>,
         ServiceCallRequestResult: Decode<Format>,
     {
-        let mut request_stream = self
-            .open_new_stream()
-            .await
-            .map_err(ServiceCallError::StreamManagement)?;
+        let mut request_stream = self.open_new_stream().await?;
 
         let request = RequestKind::ServiceCall {
             kind,
             id,
             function_id,
         };
-        request_stream
-            .send_encodable(&request)
-            .await
-            .map_err(ServiceCallError::RequestEncode)?;
-        request_stream
-            .send_encodable(args)
-            .await
-            .map_err(ServiceCallError::ArgsEncode)?;
+        request_stream.send_encodable(&request).await?;
+        request_stream.send_encodable(args).await?;
 
         request_stream
             .receive_decodable::<ServiceCallRequestResult, _>()
-            .await
-            .map_err(ServiceCallError::ResponseDecode)?
-            .map_err(ServiceCallError::Remote)?;
+            .await??;
 
-        let result = request_stream
-            .receive_decodable()
-            .await
-            .map_err(ServiceCallError::ReturnsDecode)?;
-        request_stream
-            .close()
-            .await
-            .map_err(ServiceCallError::StreamIO)?;
+        let result = request_stream.receive_decodable().await?;
+        request_stream.close().await?;
         Ok(result)
     }
 }

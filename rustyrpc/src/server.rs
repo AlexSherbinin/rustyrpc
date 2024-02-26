@@ -19,7 +19,7 @@ use alloc::sync::Arc;
 use core::marker::PhantomData;
 use futures::lock::Mutex;
 use log::trace;
-use std::collections::HashMap;
+use std::{collections::HashMap, io};
 
 pub use builder::ServerBuilder;
 pub use private_service::{PrivateServiceAllocator, ServiceRef};
@@ -55,7 +55,7 @@ where
 
     async fn accept_connection(
         &self,
-    ) -> Result<ClientConnection<Listener::Connection, Format>, Listener::Error> {
+    ) -> io::Result<ClientConnection<Listener::Connection, Format>> {
         self.listener
             .lock()
             .await

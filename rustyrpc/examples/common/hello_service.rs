@@ -1,9 +1,8 @@
-use std::{borrow::Cow, future::Future, marker::PhantomData, sync::Arc};
+use std::{borrow::Cow, future::Future, io, marker::PhantomData, sync::Arc};
 
 use derive_where::derive_where;
 use rustyrpc::{
     client::Client,
-    error::ServiceCallError,
     format::{Decode, Encode, EncodingFormat},
     protocol::{RequestKind, ServiceCallRequestError, ServiceCallRequestResult, ServiceKind},
     server::PrivateServiceAllocator,
@@ -66,7 +65,7 @@ where
             .hello()
             .await
             .encode()
-            .map_err(|_| ServiceCallRequestError::ReturnsEncode)
+            .map_err(|_| ServiceCallRequestError::ServerInternal)
     }
 }
 
@@ -99,7 +98,7 @@ impl<Connection: transport::Connection, Format: EncodingFormat> ServiceClient<Co
 impl<Connection: transport::Connection, Format: EncodingFormat>
     HelloServiceClient<Connection, Format>
 {
-    pub async fn hello(&self) -> Result<String, ServiceCallError<Connection, Format, (), String>>
+    pub async fn hello(&self) -> io::Result<String>
     where
         (): Encode<Format>,
         String: Decode<Format>,

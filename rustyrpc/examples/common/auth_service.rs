@@ -96,7 +96,7 @@ where
 
         service_ref
             .encode()
-            .map_err(|_| ServiceCallRequestError::ReturnsEncode)
+            .map_err(|_| ServiceCallRequestError::ServerInternal)
     }
 }
 

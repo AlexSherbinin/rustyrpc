@@ -42,7 +42,7 @@ impl From<ServiceCallRequestError> for protocol::ServiceCallRequestError {
             ServiceCallRequestError::InvalidServiceId => Self::InvalidServiceId,
             ServiceCallRequestError::InvalidFunctionId => Self::InvalidFunctionId,
             ServiceCallRequestError::ArgsDecode => Self::ArgsDecode,
-            ServiceCallRequestError::ReturnsDecode => Self::ReturnsEncode,
+            ServiceCallRequestError::ReturnsDecode => Self::ServerInternal,
         }
     }
 }
@@ -53,7 +53,7 @@ impl From<&protocol::ServiceCallRequestError> for ServiceCallRequestError {
             protocol::ServiceCallRequestError::InvalidServiceId => Self::InvalidServiceId,
             protocol::ServiceCallRequestError::InvalidFunctionId => Self::InvalidFunctionId,
             protocol::ServiceCallRequestError::ArgsDecode => Self::ArgsDecode,
-            protocol::ServiceCallRequestError::ReturnsEncode => Self::ReturnsDecode,
+            protocol::ServiceCallRequestError::ServerInternal => Self::ReturnsDecode,
         }
     }
 }

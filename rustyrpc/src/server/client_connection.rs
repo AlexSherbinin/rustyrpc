@@ -1,4 +1,5 @@
 use core::marker::PhantomData;
+use std::io;
 
 use crate::{
     format::EncodingFormat,
@@ -17,7 +18,7 @@ impl<Connection: transport::Connection, Format: EncodingFormat>
 {
     pub(crate) async fn accept_call_stream(
         &mut self,
-    ) -> Result<CallStream<Connection::Stream, Format>, Connection::Error> {
+    ) -> io::Result<CallStream<Connection::Stream, Format>> {
         Ok(self.connection.accept_stream().await?.into())
     }
 }
