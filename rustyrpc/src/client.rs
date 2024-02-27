@@ -6,7 +6,10 @@ use tokio::sync::Mutex;
 
 use crate::{
     format::{self, Decode, Encode, EncodingFormat},
-    protocol::{RequestKind, ServiceCallRequestResult, ServiceIdRequestResult, ServiceKind},
+    protocol::{
+        PrivateServiceDeallocateRequestResult, RequestKind, ServiceCallRequestResult,
+        ServiceIdRequestResult, ServiceKind,
+    },
     service::ServiceClient,
     transport::{self, Stream, StreamExt},
     utils::{ConnectionCloseOnDrop, DropOwned},
@@ -18,7 +21,10 @@ pub struct Client<Connection: transport::Connection, Format: format::EncodingFor
     _format: PhantomData<Format>,
 }
 
-impl<Connection: transport::Connection, Format: format::EncodingFormat> Client<Connection, Format> {
+impl<Connection: transport::Connection, Format: format::EncodingFormat> Client<Connection, Format>
+where
+    for<'a> RequestKind<'a>: Encode<Format>,
+{
     async fn open_new_stream(&self) -> io::Result<Connection::Stream> {
         let mut transport_connection = self.connection.lock().await;
         transport_connection.deref_mut().0.new_stream().await
@@ -30,7 +36,6 @@ impl<Connection: transport::Connection, Format: format::EncodingFormat> Client<C
     /// Returns an error if service request fails.
     pub async fn get_service_client<T>(self: Arc<Self>) -> io::Result<T>
     where
-        for<'b> RequestKind<'b>: Encode<Format>,
         ServiceIdRequestResult: Decode<Format>,
         T: ServiceClient<Connection, Format>,
     {
@@ -50,7 +55,6 @@ impl<Connection: transport::Connection, Format: format::EncodingFormat> Client<C
     /// Returns an error if service request fails.
     pub async fn request_service<'a>(&self, name: &'a str, checksum: &'a [u8]) -> io::Result<u32>
     where
-        for<'b> RequestKind<'b>: Encode<Format>,
         ServiceIdRequestResult: Decode<Format>,
     {
         let mut request_stream = self.open_new_stream().await?;
@@ -77,7 +81,6 @@ impl<Connection: transport::Connection, Format: format::EncodingFormat> Client<C
         args: &Args,
     ) -> io::Result<Returns>
     where
-        RequestKind<'static>: Encode<Format>,
         Args: Encode<Format>,
         Returns: Decode<Format>,
         ServiceCallRequestResult: Decode<Format>,
@@ -99,6 +102,26 @@ impl<Connection: transport::Connection, Format: format::EncodingFormat> Client<C
         let result = request_stream.receive_decodable().await?;
         request_stream.close().await?;
         Ok(result)
+    }
+
+    /// Deallocate private service previously returned from public service.
+    ///
+    /// # Errors
+    /// Returns an error if service deallocation fails.
+    pub async fn deallocate_private_service(&self, id: u32) -> io::Result<()>
+    where
+        PrivateServiceDeallocateRequestResult: Decode<Format>,
+    {
+        let mut request_stream = self.open_new_stream().await?;
+
+        let request = RequestKind::DeallocatePrivateService { id };
+        request_stream.send_encodable(&request).await?;
+
+        request_stream
+            .receive_decodable::<PrivateServiceDeallocateRequestResult, _>()
+            .await??;
+        request_stream.close().await?;
+        Ok(())
     }
 }
 

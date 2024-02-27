@@ -3,6 +3,7 @@ use crate::{
         DecodeZeroCopy, DecodeZeroCopyFallible, Encode, EncodingFormat, ZeroCopyEncodingFormat,
     },
     protocol::{
+        InvalidPrivateServiceIdError, PrivateServiceDeallocateRequestResult,
         RemoteServiceIdRequestError, RequestKind, ServiceCallRequestError,
         ServiceCallRequestResult, ServiceFound, ServiceIdRequestResult, ServiceKind,
     },
@@ -24,7 +25,12 @@ pub(crate) trait CallHandler {
         self,
         name: &str,
         checksum: &[u8],
-    ) -> impl Future<Output = Result<u32, RemoteServiceIdRequestError>>;
+    ) -> impl Future<Output = Result<u32, RemoteServiceIdRequestError>> + Send;
+
+    fn handle_private_service_deallocation(
+        self,
+        service_id: u32,
+    ) -> impl Future<Output = Result<(), InvalidPrivateServiceIdError>> + Send;
 }
 
 pub(crate) struct CallStream<Stream: transport::Stream, Format: EncodingFormat> {
@@ -34,14 +40,14 @@ pub(crate) struct CallStream<Stream: transport::Stream, Format: EncodingFormat> 
 
 impl<Stream: transport::Stream, Format: ZeroCopyEncodingFormat> CallStream<Stream, Format>
 where
+    for<'b, 'c> RequestKind<'b>:
+        DecodeZeroCopy<'b, Format, <RequestKind<'c> as DecodeZeroCopyFallible<Format>>::Error>,
     ServiceIdRequestResult: Encode<Format>,
+    ServiceCallRequestResult: Encode<Format>,
+    PrivateServiceDeallocateRequestResult: Encode<Format>,
 {
     pub(crate) async fn handle_call<'a, H>(mut self, handler: H) -> io::Result<()>
     where
-        for<'b, 'c> RequestKind<'b>:
-            DecodeZeroCopy<'b, Format, <RequestKind<'c> as DecodeZeroCopyFallible<Format>>::Error>,
-        ServiceIdRequestResult: Encode<Format>,
-        ServiceCallRequestResult: Encode<Format>,
         H: CallHandler,
     {
         let request = self.stream.receive().await?;
@@ -62,6 +68,10 @@ where
 
                 self.handle_service_call_request(handler, kind, id, function_id, args)
                     .await?;
+            }
+            RequestKind::DeallocatePrivateService { id } => {
+                let response = handler.handle_private_service_deallocation(id).await;
+                self.stream.send_encodable(&response).await?;
             }
         }
 

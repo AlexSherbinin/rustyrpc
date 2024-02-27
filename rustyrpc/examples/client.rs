@@ -1,6 +1,6 @@
 mod common;
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use common::{auth_service::AuthServiceClient, hello_service::HelloServiceClient};
 use log::{error, info};
@@ -8,7 +8,7 @@ use quinn::ClientConfig;
 use rustyrpc::{
     client::Client,
     format::{Decode, Encode, EncodingFormat},
-    protocol::{RequestKind, ServiceCallRequestResult},
+    protocol::{PrivateServiceDeallocateRequestResult, RequestKind, ServiceCallRequestResult},
     transport,
 };
 
@@ -47,24 +47,26 @@ async fn main() {
     } else {
         error!("Failed to authenticate: invalid username or password");
     }
+    tokio::time::sleep(Duration::from_secs(2)).await; // Waiting to allow HelloService deallocation request to be sent.
 }
 
 async fn start_healthcheck<Connection: transport::Connection, Format: EncodingFormat>(
     hello_service_client: HelloServiceClient<Connection, Format>,
 ) where
+    for<'a> RequestKind<'a>: Encode<Format>,
+    ServiceCallRequestResult: Decode<Format>,
+    PrivateServiceDeallocateRequestResult: Decode<Format>,
     (): Encode<Format>,
     String: Decode<Format>,
-    RequestKind<'static>: Encode<Format>,
-    ServiceCallRequestResult: Decode<Format>,
 {
-    loop {
+    for _ in 0..3 {
         if let Err(err) = hello_service_client.hello().await {
             error!("Healthcheck attempt failed: {err:?}");
         } else {
             info!("Successful healthcheck attempt");
         }
 
-        // tokio::time::sleep(Duration::from_secs(1)).await;
+        tokio::time::sleep(Duration::from_secs(1)).await;
     }
 }
 

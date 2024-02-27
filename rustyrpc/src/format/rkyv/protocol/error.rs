@@ -57,3 +57,19 @@ impl From<&protocol::ServiceCallRequestError> for ServiceCallRequestError {
         }
     }
 }
+
+#[derive(Serialize, Deserialize, Archive)]
+#[archive(check_bytes)]
+pub struct InvalidPrivateServiceIdError;
+
+impl From<InvalidPrivateServiceIdError> for protocol::InvalidPrivateServiceIdError {
+    fn from(_error: InvalidPrivateServiceIdError) -> Self {
+        Self
+    }
+}
+
+impl From<&protocol::InvalidPrivateServiceIdError> for InvalidPrivateServiceIdError {
+    fn from(_error: &protocol::InvalidPrivateServiceIdError) -> Self {
+        Self
+    }
+}

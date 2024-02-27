@@ -13,16 +13,19 @@ use super::service_kind::ServiceKind;
 #[derive(Serialize, Archive)]
 #[archive(check_bytes)]
 pub enum RequestKind<'a> {
-    ServiceIdRequest {
+    ServiceId {
         #[with(RefAsBox)]
         name: &'a str,
         #[with(RefAsBox)]
         checksum: &'a [u8],
     },
-    ServiceCallRequest {
+    ServiceCall {
         kind: ServiceKind,
         id: u32,
         function_id: u32,
+    },
+    DeallocatePrivateService {
+        id: u32,
     },
 }
 
@@ -32,17 +35,20 @@ impl<'a> From<&protocol::RequestKind<'a>> for RequestKind<'a> {
     fn from(value: &protocol::RequestKind<'a>) -> Self {
         match value {
             protocol::RequestKind::ServiceId { name, checksum } => {
-                Self::ServiceIdRequest { name, checksum }
+                Self::ServiceId { name, checksum }
             }
             protocol::RequestKind::ServiceCall {
                 kind,
                 id,
                 function_id,
-            } => Self::ServiceCallRequest {
+            } => Self::ServiceCall {
                 kind: (*kind).into(),
                 id: *id,
                 function_id: *function_id,
             },
+            protocol::RequestKind::DeallocatePrivateService { id } => {
+                Self::DeallocatePrivateService { id: *id }
+            }
         }
     }
 }
@@ -50,10 +56,8 @@ impl<'a> From<&protocol::RequestKind<'a>> for RequestKind<'a> {
 impl<'a> From<&'a ArchivedRequestKind<'a>> for protocol::RequestKind<'a> {
     fn from(value: &'a ArchivedRequestKind) -> Self {
         match value {
-            ArchivedRequestKind::ServiceIdRequest { name, checksum } => {
-                Self::ServiceId { name, checksum }
-            }
-            ArchivedRequestKind::ServiceCallRequest {
+            ArchivedRequestKind::ServiceId { name, checksum } => Self::ServiceId { name, checksum },
+            ArchivedRequestKind::ServiceCall {
                 kind,
                 id,
                 function_id,
@@ -62,6 +66,9 @@ impl<'a> From<&'a ArchivedRequestKind<'a>> for protocol::RequestKind<'a> {
                 id: *id,
                 function_id: *function_id,
             },
+            ArchivedRequestKind::DeallocatePrivateService { id } => {
+                Self::DeallocatePrivateService { id: *id }
+            }
         }
     }
 }

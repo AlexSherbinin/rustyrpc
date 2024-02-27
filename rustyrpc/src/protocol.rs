@@ -24,6 +24,8 @@ use thiserror::Error;
 pub type ServiceIdRequestResult = Result<ServiceFound, RemoteServiceIdRequestError>;
 /// Response on service call request
 pub type ServiceCallRequestResult = Result<(), ServiceCallRequestError>;
+/// Response on private service deallocation request
+pub type PrivateServiceDeallocateRequestResult = Result<(), InvalidPrivateServiceIdError>;
 
 /// Requests that can be made.
 pub enum RequestKind<'a> {
@@ -42,6 +44,11 @@ pub enum RequestKind<'a> {
         id: u32,
         /// Service's function id
         function_id: u32,
+    },
+    /// Request to deallocate private service
+    DeallocatePrivateService {
+        /// Private service id
+        id: u32,
     },
 }
 
@@ -108,5 +115,16 @@ impl From<ServiceCallRequestError> for io::Error {
         };
 
         io::Error::new(kind, error)
+    }
+}
+
+/// Error that may occur while trying to deallocate private service.
+#[derive(Error, Debug)]
+#[error("Invalid private service id")]
+pub struct InvalidPrivateServiceIdError;
+
+impl From<InvalidPrivateServiceIdError> for io::Error {
+    fn from(error: InvalidPrivateServiceIdError) -> Self {
+        io::Error::new(io::ErrorKind::InvalidInput, error)
     }
 }

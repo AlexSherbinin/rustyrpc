@@ -1,7 +1,10 @@
 use super::{call_stream::CallHandler, PrivateServiceAllocator, Server};
 use crate::{
     format::EncodingFormat,
-    protocol::{RemoteServiceIdRequestError, ServiceCallRequestError, ServiceKind},
+    protocol::{
+        InvalidPrivateServiceIdError, RemoteServiceIdRequestError, ServiceCallRequestError,
+        ServiceKind,
+    },
     service::Service,
     transport,
 };
@@ -109,6 +112,28 @@ impl<Listener: transport::ConnectionListener, Format: EncodingFormat> CallHandle
             Ok(*service_id)
         } else {
             Err(RemoteServiceIdRequestError::InvalidChecksum)
+        }
+    }
+
+    #[allow(clippy::map_err_ignore)]
+    async fn handle_private_service_deallocation(
+        self,
+        service_id: u32,
+    ) -> Result<(), InvalidPrivateServiceIdError> {
+        trace!("Received private service deallocation request. Service id: {service_id}");
+
+        let service_id = service_id
+            .try_into()
+            .map_err(|_| InvalidPrivateServiceIdError)?;
+        if self
+            .private_service_allocator
+            .deallocate_by_id(service_id)
+            .await
+            .is_some()
+        {
+            Ok(())
+        } else {
+            Err(InvalidPrivateServiceIdError)
         }
     }
 }

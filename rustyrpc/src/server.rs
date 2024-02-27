@@ -10,7 +10,10 @@ use crate::{
     format::{
         DecodeZeroCopy, DecodeZeroCopyFallible, Encode, EncodingFormat, ZeroCopyEncodingFormat,
     },
-    protocol::{RequestKind, ServiceCallRequestResult, ServiceIdRequestResult},
+    protocol::{
+        PrivateServiceDeallocateRequestResult, RequestKind, ServiceCallRequestResult,
+        ServiceIdRequestResult,
+    },
     server::call_handler::ServerCallHandler,
     service::Service,
     transport,
@@ -41,6 +44,7 @@ where
         DecodeZeroCopy<'a, Format, <RequestKind<'b> as DecodeZeroCopyFallible<Format>>::Error>,
     ServiceIdRequestResult: Encode<Format>,
     ServiceCallRequestResult: Encode<Format>,
+    PrivateServiceDeallocateRequestResult: Encode<Format>,
     u32: Encode<Format>,
 {
     /// Starts listening for incoming connections and handles them.

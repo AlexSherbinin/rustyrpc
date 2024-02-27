@@ -19,6 +19,8 @@ impl !DefaultEncode for protocol::ServiceIdRequestResult {}
 #[allow(suspicious_auto_trait_impls)]
 impl !DefaultEncode for protocol::ServiceCallRequestResult {}
 #[allow(suspicious_auto_trait_impls)]
+impl !DefaultEncode for protocol::PrivateServiceDeallocateRequestResult {}
+#[allow(suspicious_auto_trait_impls)]
 impl !DefaultEncode for Option<ServiceRef> {}
 
 impl<T> Encode<RkyvFormat> for T

@@ -6,7 +6,10 @@ use rkyv::{with::RefAsBox, Archive, Serialize};
 use rustyrpc::{
     client::Client,
     format::{Decode, Encode, EncodingFormat},
-    protocol::{RequestKind, ServiceCallRequestError, ServiceCallRequestResult, ServiceKind},
+    protocol::{
+        PrivateServiceDeallocateRequestResult, RequestKind, ServiceCallRequestError,
+        ServiceCallRequestResult, ServiceKind,
+    },
     server::{PrivateServiceAllocator, ServiceRef},
     service::{IntoService, Service, ServiceClient, ServiceMetadata, ServiceWrapper},
     transport,
@@ -110,8 +113,9 @@ pub struct AuthServiceClient<Connection: transport::Connection, Format: Encoding
 impl<Connection: transport::Connection, Format: EncodingFormat>
     AuthServiceClient<Connection, Format>
 where
-    RequestKind<'static>: Encode<Format>,
+    for<'a> RequestKind<'a>: Encode<Format>,
     ServiceCallRequestResult: Decode<Format>,
+    PrivateServiceDeallocateRequestResult: Decode<Format>,
 {
     pub async fn auth(
         &self,

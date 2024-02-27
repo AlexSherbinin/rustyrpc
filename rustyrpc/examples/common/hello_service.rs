@@ -4,7 +4,10 @@ use derive_where::derive_where;
 use rustyrpc::{
     client::Client,
     format::{Decode, Encode, EncodingFormat},
-    protocol::{RequestKind, ServiceCallRequestError, ServiceCallRequestResult, ServiceKind},
+    protocol::{
+        PrivateServiceDeallocateRequestResult, RequestKind, ServiceCallRequestError,
+        ServiceCallRequestResult, ServiceKind,
+    },
     server::PrivateServiceAllocator,
     service::{IntoService, Service, ServiceClient, ServiceMetadata, ServiceWrapper},
     transport,
@@ -69,8 +72,12 @@ where
     }
 }
 
-#[derive_where(Clone)]
-pub struct HelloServiceClient<Connection: transport::Connection, Format: EncodingFormat> {
+pub struct HelloServiceClient<Connection: transport::Connection, Format: EncodingFormat>
+where
+    for<'a> RequestKind<'a>: Encode<Format>,
+    ServiceCallRequestResult: Decode<Format>,
+    PrivateServiceDeallocateRequestResult: Decode<Format>,
+{
     service_kind: ServiceKind,
     service_id: usize,
     rpc_client: Arc<Client<Connection, Format>>,
@@ -78,6 +85,10 @@ pub struct HelloServiceClient<Connection: transport::Connection, Format: Encodin
 
 impl<Connection: transport::Connection, Format: EncodingFormat> ServiceClient<Connection, Format>
     for HelloServiceClient<Connection, Format>
+where
+    for<'a> RequestKind<'a>: Encode<Format>,
+    ServiceCallRequestResult: Decode<Format>,
+    PrivateServiceDeallocateRequestResult: Decode<Format>,
 {
     const SERVICE_NAME: &'static str = SERVICE_NAME;
     const SERVICE_CHECKSUM: &'static [u8] = SERVICE_CHECKSUM;
@@ -97,13 +108,15 @@ impl<Connection: transport::Connection, Format: EncodingFormat> ServiceClient<Co
 
 impl<Connection: transport::Connection, Format: EncodingFormat>
     HelloServiceClient<Connection, Format>
+where
+    for<'a> RequestKind<'a>: Encode<Format>,
+    ServiceCallRequestResult: Decode<Format>,
+    PrivateServiceDeallocateRequestResult: Decode<Format>,
 {
     pub async fn hello(&self) -> io::Result<String>
     where
         (): Encode<Format>,
         String: Decode<Format>,
-        RequestKind<'static>: Encode<Format>,
-        ServiceCallRequestResult: Decode<Format>,
     {
         self.rpc_client
             .call_service(
@@ -113,5 +126,26 @@ impl<Connection: transport::Connection, Format: EncodingFormat>
                 &(),
             )
             .await
+    }
+}
+
+impl<Connection: transport::Connection, Format: EncodingFormat> Drop
+    for HelloServiceClient<Connection, Format>
+where
+    for<'a> RequestKind<'a>: Encode<Format>,
+    ServiceCallRequestResult: Decode<Format>,
+    PrivateServiceDeallocateRequestResult: Decode<Format>,
+{
+    fn drop(&mut self) {
+        if let ServiceKind::Private = self.service_kind {
+            let rpc_client = Arc::clone(&self.rpc_client);
+            let service_id = self.service_id.try_into().unwrap();
+            tokio::spawn(async move {
+                rpc_client
+                    .deallocate_private_service(service_id)
+                    .await
+                    .unwrap();
+            });
+        }
     }
 }
