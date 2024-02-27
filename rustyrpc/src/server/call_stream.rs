@@ -75,6 +75,7 @@ where
             }
         }
 
+        self.stream.flush().await?;
         self.stream.stopped().await?;
 
         Ok(())

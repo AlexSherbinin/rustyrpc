@@ -12,6 +12,8 @@ pub trait Stream: Send {
     fn send(&mut self, message: Vec<u8>) -> impl Future<Output = io::Result<()>> + Send;
     /// Receive a message from stream.
     fn receive(&mut self) -> impl Future<Output = io::Result<Vec<u8>>> + Send;
+    /// Flush buffered data.
+    fn flush(&mut self) -> impl Future<Output = io::Result<()>> + Send;
     /// Wait until stream is closed by other side of connection.
     fn stopped(self) -> impl Future<Output = io::Result<()>> + Send;
     /// Close stream.

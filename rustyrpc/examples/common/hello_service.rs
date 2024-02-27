@@ -1,6 +1,5 @@
 use std::{borrow::Cow, future::Future, io, marker::PhantomData, sync::Arc};
 
-use derive_where::derive_where;
 use rustyrpc::{
     client::Client,
     format::{Decode, Encode, EncodingFormat},

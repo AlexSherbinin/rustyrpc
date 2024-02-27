@@ -1,12 +1,12 @@
 mod listener;
 
 use core::{net::SocketAddr, num::TryFromIntError};
-use futures::io::{AsyncReadExt, AsyncWriteExt};
 use quinn::{
     ClientConfig, ConnectError, ConnectionError, Endpoint, RecvStream, SendStream, StoppedError,
     VarInt,
 };
 use std::io;
+use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader, BufWriter};
 
 pub use listener::ConnectionListener;
 use thiserror::Error;
@@ -16,8 +16,8 @@ pub struct Connection(quinn::Connection);
 
 /// Stream via QUIC protocol.
 pub struct Stream {
-    send_stream: SendStream,
-    receive_stream: RecvStream,
+    send_stream: BufWriter<SendStream>,
+    receive_stream: BufReader<RecvStream>,
 }
 
 /// Error that may occur when sending invalid length prefix.
@@ -40,17 +40,16 @@ impl super::Stream for Stream {
         })?;
         let length_prefix = length_prefix.to_be_bytes();
 
-        // Tokio's AsyncWriteExt trait conflicts with same trait in futures-io, so we need to write it in this "ugly" form.
-        // Same in the receive method
-        AsyncWriteExt::write_all(&mut self.send_stream, &length_prefix).await?;
-        AsyncWriteExt::write_all(&mut self.send_stream, &message).await?;
-
+        self.send_stream.write_all(&length_prefix).await?;
+        self.send_stream.write_all(&message).await?;
         Ok(())
     }
 
     async fn receive(&mut self) -> io::Result<Vec<u8>> {
         let mut length_prefix_buffer = [0u8; 4];
-        AsyncReadExt::read_exact(&mut self.receive_stream, &mut length_prefix_buffer).await?;
+        self.receive_stream
+            .read_exact(&mut length_prefix_buffer)
+            .await?;
         let length_prefix: usize = u32::from_be_bytes(length_prefix_buffer)
             .try_into()
             .map_err(|err| {
@@ -61,13 +60,17 @@ impl super::Stream for Stream {
             })?;
 
         let mut message_buffer = vec![0u8; length_prefix];
-        AsyncReadExt::read_exact(&mut self.receive_stream, &mut message_buffer).await?;
+        self.receive_stream.read_exact(&mut message_buffer).await?;
 
         Ok(message_buffer)
     }
 
-    async fn stopped(mut self) -> io::Result<()> {
-        if let Err(err) = self.send_stream.stopped().await {
+    async fn flush(&mut self) -> io::Result<()> {
+        self.send_stream.flush().await
+    }
+
+    async fn stopped(self) -> io::Result<()> {
+        if let Err(err) = self.send_stream.into_inner().stopped().await {
             match err {
                 StoppedError::ConnectionLost(err) => Err(err.into()),
                 err @ (StoppedError::UnknownStream | StoppedError::ZeroRttRejected) => {
@@ -80,7 +83,16 @@ impl super::Stream for Stream {
     }
 
     async fn close(mut self) -> io::Result<()> {
-        self.send_stream.close().await
+        self.send_stream.shutdown().await
+    }
+}
+
+impl From<(SendStream, RecvStream)> for Stream {
+    fn from((send_stream, receive_stream): (SendStream, RecvStream)) -> Self {
+        Self {
+            send_stream: BufWriter::new(send_stream),
+            receive_stream: BufReader::new(receive_stream),
+        }
     }
 }
 
@@ -88,19 +100,11 @@ impl super::Connection for Connection {
     type Stream = Stream;
 
     async fn new_stream(&mut self) -> io::Result<Self::Stream> {
-        let (send_stream, receive_stream) = self.0.open_bi().await?;
-        Ok(Stream {
-            send_stream,
-            receive_stream,
-        })
+        Ok(self.0.open_bi().await?.into())
     }
 
     async fn accept_stream(&mut self) -> io::Result<Self::Stream> {
-        let (send_stream, receive_stream) = self.0.accept_bi().await?;
-        Ok(Stream {
-            send_stream,
-            receive_stream,
-        })
+        Ok(self.0.accept_bi().await?.into())
     }
 
     async fn close(self) -> io::Result<()> {

@@ -21,11 +21,11 @@ extension-traits = "1.0.1"
 futures = "0.3.30"
 indexmap = "2.2.3"
 log = "0.4.20"
-quinn = { version = "0.10.2", features = ["futures-io"] }
+quinn = { version = "0.10.2" }
 rkyv = { version = "0.7.43", features = ["validation"] }
 sealed = "0.5.0"
 thiserror = "1.0.56"
-tokio = "1.36.0"
+tokio = { version = "1.36.0", features = ["io-util"] }
 
 [dev-dependencies]
 pretty_env_logger = "0.5.0"
