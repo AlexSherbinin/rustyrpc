@@ -1,10 +1,7 @@
 mod listener;
 
 use core::{net::SocketAddr, num::TryFromIntError};
-use quinn::{
-    ClientConfig, ConnectError, ConnectionError, Endpoint, RecvStream, SendStream, StoppedError,
-    VarInt,
-};
+use quinn::{ClientConfig, Endpoint, RecvStream, SendStream, StoppedError, VarInt};
 use std::io;
 use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader, BufWriter};
 
@@ -113,20 +110,6 @@ impl super::Connection for Connection {
     }
 }
 
-/// Errors that may occur while connecting to server via QUIC protocol.
-#[derive(Error, Debug)]
-pub enum ConnectingError {
-    /// Indicates errors related to invalid configuration and others. See [`ConnectError`].
-    #[error(transparent)]
-    Configuration(#[from] ConnectError),
-    /// Connection establishment error like version mismatch and others.
-    #[error(transparent)]
-    ConnectionEstablishment(#[from] ConnectionError),
-    /// Indicates IO errors.
-    #[error(transparent)]
-    IO(#[from] std::io::Error),
-}
-
 impl Connection {
     /// Establishes connection to server via QUIC protocol.
     ///
@@ -137,13 +120,16 @@ impl Connection {
         local_address: SocketAddr,
         address: SocketAddr,
         server_name: &str,
-    ) -> Result<Self, ConnectingError> {
+    ) -> io::Result<Self> {
         let mut endpoint = Endpoint::client(local_address)?;
         endpoint.set_default_client_config(client_config);
 
-        let connection = endpoint.connect(address, server_name)?.await?;
+        let connection = endpoint
+            .connect(address, server_name)
+            .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?
+            .await?;
 
-        Ok(Self(connection))
+        Ok(connection.into())
     }
 }
 
