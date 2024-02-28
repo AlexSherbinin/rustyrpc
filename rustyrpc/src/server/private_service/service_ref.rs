@@ -14,7 +14,7 @@ impl ServiceRef {
     /// Creates service client from reference and [rpc client][Client]
     pub fn into_client<
         ServiceClient: service::ServiceClient<Connection, Format>,
-        Connection: transport::Connection,
+        Connection: transport::ClientConnection,
         Format: EncodingFormat,
     >(
         self,

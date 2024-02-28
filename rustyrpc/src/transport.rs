@@ -40,23 +40,34 @@ impl<T: Stream> T {
     }
 }
 
-/// Transport specific incoming connection.
+/// Transport specific connection.
 pub trait Connection: Send + 'static {
+    /// Close connection.
+    fn close(self) -> impl Future<Output = io::Result<()>> + Send;
+}
+
+/// Transport specific connection on client side.
+pub trait ClientConnection: Connection {
     /// Stream produced by connection.
     type Stream: Stream + 'static;
 
     /// Create new stream and notify other side of connection about it.
     fn new_stream(&mut self) -> impl Future<Output = io::Result<Self::Stream>> + Send;
+}
+
+/// Transport specific connection on server side.
+pub trait ServerConnection: Connection {
+    /// Stream produced by connection.
+    type Stream: Stream + 'static;
+
     /// Accept new stream created by other side of connection.
     fn accept_stream(&mut self) -> impl Future<Output = io::Result<Self::Stream>> + Send;
-    /// Close connection.
-    fn close(self) -> impl Future<Output = io::Result<()>> + Send;
 }
 
 /// Transport specific incoming connections listener like a [`TcpListener`][`std::net::TcpListener`] or others
 pub trait ConnectionListener: Send {
     /// Connection produced by listener
-    type Connection: Connection;
+    type Connection: ServerConnection;
 
     /// Accepts a new connection
     fn accept_connection(&mut self) -> impl Future<Output = io::Result<Self::Connection>>;

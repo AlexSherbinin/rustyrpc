@@ -3,7 +3,7 @@ use std::io;
 
 use quinn::{Endpoint, ServerConfig};
 
-use super::Connection;
+use super::connection::Connection;
 
 /// Listener for incoming connections via QUIC protocol.
 pub struct ConnectionListener(quinn::Endpoint);
@@ -18,7 +18,7 @@ impl crate::transport::ConnectionListener for ConnectionListener {
             .await
             .ok_or_else(|| io::Error::new(io::ErrorKind::NotConnected, "Endpoint is closed"))?
             .await
-            .map(Connection)?)
+            .map(Into::into)?)
     }
 }
 

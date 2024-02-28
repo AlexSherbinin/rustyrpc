@@ -16,12 +16,13 @@ use crate::{
 };
 
 /// RPC client for calling remote services.
-pub struct Client<Connection: transport::Connection, Format: format::EncodingFormat> {
+pub struct Client<Connection: transport::ClientConnection, Format: format::EncodingFormat> {
     connection: Mutex<DropOwned<ConnectionCloseOnDrop<Connection>>>,
     _format: PhantomData<Format>,
 }
 
-impl<Connection: transport::Connection, Format: format::EncodingFormat> Client<Connection, Format>
+impl<Connection: transport::ClientConnection, Format: format::EncodingFormat>
+    Client<Connection, Format>
 where
     for<'a> RequestKind<'a>: Encode<Format>,
 {
@@ -125,7 +126,7 @@ where
     }
 }
 
-impl<Connection: transport::Connection, Format: EncodingFormat> From<Connection>
+impl<Connection: transport::ClientConnection, Format: EncodingFormat> From<Connection>
     for Client<Connection, Format>
 {
     fn from(connection: Connection) -> Self {

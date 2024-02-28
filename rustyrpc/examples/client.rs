@@ -50,7 +50,7 @@ async fn main() {
     tokio::time::sleep(Duration::from_secs(2)).await; // Waiting to allow HelloService deallocation request to be sent.
 }
 
-async fn start_healthcheck<Connection: transport::Connection, Format: EncodingFormat>(
+async fn start_healthcheck<Connection: transport::ClientConnection, Format: EncodingFormat>(
     hello_service_client: HelloServiceClient<Connection, Format>,
 ) where
     for<'a> RequestKind<'a>: Encode<Format>,

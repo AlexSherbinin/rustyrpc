@@ -11,7 +11,7 @@ use crate::{
 };
 
 /// Service client for interaction with specific remote service.
-pub trait ServiceClient<Connection: transport::Connection, Format: EncodingFormat>
+pub trait ServiceClient<Connection: transport::ClientConnection, Format: EncodingFormat>
 where
     Self: Sized,
 {

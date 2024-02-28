@@ -8,12 +8,13 @@ use crate::{
 
 use super::call_stream::CallStream;
 
-pub(crate) struct ClientConnection<Connection: transport::Connection, Format: EncodingFormat> {
+pub(crate) struct ClientConnection<Connection: transport::ServerConnection, Format: EncodingFormat>
+{
     connection: Connection,
     _format: PhantomData<Format>,
 }
 
-impl<Connection: transport::Connection, Format: EncodingFormat>
+impl<Connection: transport::ServerConnection, Format: EncodingFormat>
     ClientConnection<Connection, Format>
 {
     pub(crate) async fn accept_call_stream(
@@ -23,7 +24,7 @@ impl<Connection: transport::Connection, Format: EncodingFormat>
     }
 }
 
-impl<Connection: transport::Connection, Format: EncodingFormat> From<Connection>
+impl<Connection: transport::ServerConnection, Format: EncodingFormat> From<Connection>
     for ClientConnection<Connection, Format>
 {
     fn from(connection: Connection) -> Self {

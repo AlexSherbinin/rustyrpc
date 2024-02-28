@@ -104,13 +104,13 @@ where
 }
 
 #[derive_where(Clone)]
-pub struct AuthServiceClient<Connection: transport::Connection, Format: EncodingFormat> {
+pub struct AuthServiceClient<Connection: transport::ClientConnection, Format: EncodingFormat> {
     service_kind: ServiceKind,
     service_id: usize,
     rpc_client: Arc<Client<Connection, Format>>,
 }
 
-impl<Connection: transport::Connection, Format: EncodingFormat>
+impl<Connection: transport::ClientConnection, Format: EncodingFormat>
     AuthServiceClient<Connection, Format>
 where
     for<'a> RequestKind<'a>: Encode<Format>,
@@ -142,8 +142,8 @@ where
     }
 }
 
-impl<Connection: transport::Connection, Format: EncodingFormat> ServiceClient<Connection, Format>
-    for AuthServiceClient<Connection, Format>
+impl<Connection: transport::ClientConnection, Format: EncodingFormat>
+    ServiceClient<Connection, Format> for AuthServiceClient<Connection, Format>
 {
     const SERVICE_NAME: &'static str = SERVICE_NAME;
     const SERVICE_CHECKSUM: &'static [u8] = SERVICE_CHECKSUM;

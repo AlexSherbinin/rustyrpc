@@ -71,7 +71,7 @@ where
     }
 }
 
-pub struct HelloServiceClient<Connection: transport::Connection, Format: EncodingFormat>
+pub struct HelloServiceClient<Connection: transport::ClientConnection, Format: EncodingFormat>
 where
     for<'a> RequestKind<'a>: Encode<Format>,
     ServiceCallRequestResult: Decode<Format>,
@@ -82,8 +82,8 @@ where
     rpc_client: Arc<Client<Connection, Format>>,
 }
 
-impl<Connection: transport::Connection, Format: EncodingFormat> ServiceClient<Connection, Format>
-    for HelloServiceClient<Connection, Format>
+impl<Connection: transport::ClientConnection, Format: EncodingFormat>
+    ServiceClient<Connection, Format> for HelloServiceClient<Connection, Format>
 where
     for<'a> RequestKind<'a>: Encode<Format>,
     ServiceCallRequestResult: Decode<Format>,
@@ -105,7 +105,7 @@ where
     }
 }
 
-impl<Connection: transport::Connection, Format: EncodingFormat>
+impl<Connection: transport::ClientConnection, Format: EncodingFormat>
     HelloServiceClient<Connection, Format>
 where
     for<'a> RequestKind<'a>: Encode<Format>,
@@ -128,7 +128,7 @@ where
     }
 }
 
-impl<Connection: transport::Connection, Format: EncodingFormat> Drop
+impl<Connection: transport::ClientConnection, Format: EncodingFormat> Drop
     for HelloServiceClient<Connection, Format>
 where
     for<'a> RequestKind<'a>: Encode<Format>,
