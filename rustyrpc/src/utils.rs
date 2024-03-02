@@ -1,4 +1,7 @@
-use core::ops::{Deref, DerefMut};
+use core::{
+    mem::MaybeUninit,
+    ops::{Deref, DerefMut},
+};
 
 use crate::transport;
 
@@ -17,11 +20,11 @@ pub(crate) trait OwnedDroppable {
     fn drop_owned(self);
 }
 
-pub(crate) struct DropOwned<T: OwnedDroppable>(Option<T>);
+pub(crate) struct DropOwned<T: OwnedDroppable>(MaybeUninit<T>);
 
 impl<T: OwnedDroppable> From<T> for DropOwned<T> {
     fn from(value: T) -> Self {
-        Self(Some(value))
+        Self(MaybeUninit::new(value))
     }
 }
 
@@ -30,20 +33,20 @@ impl<T: OwnedDroppable> Deref for DropOwned<T> {
 
     #[allow(clippy::undocumented_unsafe_blocks)]
     fn deref(&self) -> &Self::Target {
-        unsafe { self.0.as_ref().unwrap_unchecked() }
+        unsafe { self.0.assume_init_ref() }
     }
 }
 
 impl<T: OwnedDroppable> DerefMut for DropOwned<T> {
     #[allow(clippy::undocumented_unsafe_blocks)]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { self.0.as_mut().unwrap_unchecked() }
+        unsafe { self.0.assume_init_mut() }
     }
 }
 
 impl<T: OwnedDroppable> Drop for DropOwned<T> {
     #[allow(clippy::undocumented_unsafe_blocks)]
     fn drop(&mut self) {
-        unsafe { self.0.take().unwrap_unchecked() }.drop_owned();
+        unsafe { self.0.assume_init_read() }.drop_owned();
     }
 }
