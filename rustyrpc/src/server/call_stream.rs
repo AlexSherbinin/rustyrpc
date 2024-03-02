@@ -14,7 +14,7 @@ use std::io;
 
 pub(crate) trait CallHandler {
     fn handle_call(
-        self,
+        &self,
         kind: ServiceKind,
         service_id: u32,
         function_id: u32,
@@ -22,13 +22,13 @@ pub(crate) trait CallHandler {
     ) -> impl Future<Output = Result<Vec<u8>, ServiceCallRequestError>> + Send;
 
     fn handle_service_request(
-        self,
+        &self,
         name: &str,
         checksum: &[u8],
     ) -> impl Future<Output = Result<u32, RemoteServiceIdRequestError>> + Send;
 
     fn handle_private_service_deallocation(
-        self,
+        &self,
         service_id: u32,
     ) -> impl Future<Output = Result<(), InvalidPrivateServiceIdError>> + Send;
 }
@@ -46,44 +46,43 @@ where
     ServiceCallRequestResult: Encode<Format>,
     PrivateServiceDeallocateRequestResult: Encode<Format>,
 {
-    pub(crate) async fn handle_call<'a, H>(mut self, handler: H) -> io::Result<()>
+    pub(crate) async fn handle_call<H>(mut self, handler: &H) -> io::Result<()>
     where
         H: CallHandler,
     {
-        let request = self.stream.receive().await?;
-        let request = RequestKind::decode_zero_copy(&request)
-            .map_err(|err| io::Error::new(io::ErrorKind::InvalidInput, err))?;
+        loop {
+            let request = self.stream.receive().await?;
+            let request = RequestKind::decode_zero_copy(&request)
+                .map_err(|err| io::Error::new(io::ErrorKind::InvalidInput, err))?;
 
-        match request {
-            RequestKind::ServiceId { name, checksum } => {
-                self.handle_service_id_request(handler, name, checksum)
-                    .await?;
-            }
-            RequestKind::ServiceCall {
-                kind,
-                id,
-                function_id,
-            } => {
-                let args = self.stream.receive().await?;
+            match request {
+                RequestKind::ServiceId { name, checksum } => {
+                    self.handle_service_id_request(handler, name, checksum)
+                        .await?;
+                }
+                RequestKind::ServiceCall {
+                    kind,
+                    id,
+                    function_id,
+                } => {
+                    let args = self.stream.receive().await?;
 
-                self.handle_service_call_request(handler, kind, id, function_id, args)
-                    .await?;
+                    self.handle_service_call_request(handler, kind, id, function_id, args)
+                        .await?;
+                }
+                RequestKind::DeallocatePrivateService { id } => {
+                    let response = handler.handle_private_service_deallocation(id).await;
+                    self.stream.send_encodable(&response).await?;
+                }
             }
-            RequestKind::DeallocatePrivateService { id } => {
-                let response = handler.handle_private_service_deallocation(id).await;
-                self.stream.send_encodable(&response).await?;
-            }
+
+            self.stream.flush().await?;
         }
-
-        self.stream.flush().await?;
-        self.stream.stopped().await?;
-
-        Ok(())
     }
 
     async fn handle_service_id_request<H: CallHandler>(
         &mut self,
-        handler: H,
+        handler: &H,
         name: &str,
         checksum: &[u8],
     ) -> io::Result<()> {
@@ -97,7 +96,7 @@ where
 
     async fn handle_service_call_request<H: CallHandler>(
         &mut self,
-        handler: H,
+        handler: &H,
         kind: ServiceKind,
         service_id: u32,
         function_id: u32,

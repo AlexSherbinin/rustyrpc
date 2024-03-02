@@ -27,11 +27,12 @@ async fn main() {
 
     let (username, password) = parse_args();
 
-    let connection = transport::quic::Connection::connect(
+    let connection = transport::quic::ClientConnection::connect(
         client_config(),
         "0.0.0.0:0".parse().unwrap(),
         "127.0.0.1:8888".parse().unwrap(),
         "localhost",
+        1,
     )
     .await
     .unwrap();

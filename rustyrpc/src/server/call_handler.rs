@@ -64,7 +64,7 @@ impl<Listener: transport::ConnectionListener, Format: EncodingFormat> CallHandle
     for ServerCallHandler<Listener, Format>
 {
     async fn handle_call(
-        self,
+        &self,
         kind: ServiceKind,
         service_id: u32,
         function_id: u32,
@@ -97,7 +97,7 @@ impl<Listener: transport::ConnectionListener, Format: EncodingFormat> CallHandle
     }
 
     async fn handle_service_request(
-        self,
+        &self,
         name: &str,
         checksum: &[u8],
     ) -> Result<u32, RemoteServiceIdRequestError> {
@@ -117,7 +117,7 @@ impl<Listener: transport::ConnectionListener, Format: EncodingFormat> CallHandle
 
     #[allow(clippy::map_err_ignore)]
     async fn handle_private_service_deallocation(
-        self,
+        &self,
         service_id: u32,
     ) -> Result<(), InvalidPrivateServiceIdError> {
         trace!("Received private service deallocation request. Service id: {service_id}");

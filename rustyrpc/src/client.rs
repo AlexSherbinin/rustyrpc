@@ -62,11 +62,11 @@ where
 
         let request = RequestKind::ServiceId { name, checksum };
         request_stream.send_encodable(&request).await?;
+        request_stream.flush().await?;
 
         let service_id = request_stream
             .receive_decodable::<ServiceIdRequestResult, _>()
             .await??;
-        request_stream.close().await?;
         Ok(service_id.0)
     }
 
@@ -95,13 +95,13 @@ where
         };
         request_stream.send_encodable(&request).await?;
         request_stream.send_encodable(args).await?;
+        request_stream.flush().await?;
 
         request_stream
             .receive_decodable::<ServiceCallRequestResult, _>()
             .await??;
 
         let result = request_stream.receive_decodable().await?;
-        request_stream.close().await?;
         Ok(result)
     }
 
@@ -117,11 +117,11 @@ where
 
         let request = RequestKind::DeallocatePrivateService { id };
         request_stream.send_encodable(&request).await?;
+        request_stream.flush().await?;
 
         request_stream
             .receive_decodable::<PrivateServiceDeallocateRequestResult, _>()
             .await??;
-        request_stream.close().await?;
         Ok(())
     }
 }

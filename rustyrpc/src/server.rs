@@ -82,7 +82,7 @@ where
             let call_handler = call_handler.clone();
 
             self.tasks.spawn_task(async move {
-                call_stream.handle_call(call_handler).await.unwrap();
+                call_stream.handle_call(&call_handler).await.unwrap();
             });
         }
     }

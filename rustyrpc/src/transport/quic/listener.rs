@@ -3,13 +3,13 @@ use std::io;
 
 use quinn::{Endpoint, ServerConfig};
 
-use super::connection::Connection;
+use super::connection::ServerConnection;
 
 /// Listener for incoming connections via QUIC protocol.
 pub struct ConnectionListener(quinn::Endpoint);
 
 impl crate::transport::ConnectionListener for ConnectionListener {
-    type Connection = Connection;
+    type Connection = ServerConnection;
 
     async fn accept_connection(&mut self) -> io::Result<Self::Connection> {
         Ok(self
@@ -26,7 +26,7 @@ impl ConnectionListener {
     /// Creates new listener from [`ServerConfig`] and [`SocketAddr`]
     ///
     /// # Errors
-    /// Returns error by many reasons represented in [`ConnectionError`]
+    /// Returns if connection was failed to be accepted.
     pub fn new(server_config: ServerConfig, addr: SocketAddr) -> Result<Self, std::io::Error> {
         Ok(Self(Endpoint::server(server_config, addr)?))
     }
