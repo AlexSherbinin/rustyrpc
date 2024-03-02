@@ -1,19 +1,15 @@
-//! # Remote callable id request
+//! # Remote service id request
 //! ```markdown
-//! **Client opens new stream**
 //! RequestKind::ServiceIdRequest --> Server
 //! Client <-- ServiceRequestResult
-//! **Client closes stream**
 //! ```
 //!
 //! # Remote call
 //! ```markdown
-//! **Client opens new stream**
 //! RequestKind::ServiceCallRequest --> Server
 //! Args --> Server
 //! Client <-- ServiceCallRequestResult
 //! Client <-- Returns
-//! **Client closes stream**
 //! ```
 
 use std::io;
