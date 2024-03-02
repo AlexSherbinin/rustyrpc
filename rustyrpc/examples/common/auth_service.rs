@@ -4,7 +4,6 @@ use async_trait::async_trait;
 use derive_where::derive_where;
 use rkyv::{with::RefAsBox, Archive, Serialize};
 use rustyrpc::{
-    client::Client,
     format::{Decode, Encode, EncodingFormat},
     protocol::{
         PrivateServiceDeallocateRequestResult, RequestKind, ServiceCallRequestError,
@@ -12,7 +11,7 @@ use rustyrpc::{
     },
     server::{PrivateServiceAllocator, ServiceRef},
     service::{IntoService, Service, ServiceClient, ServiceMetadata, ServiceWrapper},
-    transport,
+    transport, Client,
 };
 
 use super::hello_service::HelloServiceClient;

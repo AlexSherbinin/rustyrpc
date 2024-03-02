@@ -1,7 +1,6 @@
 use std::{borrow::Cow, future::Future, io, marker::PhantomData, sync::Arc};
 
 use rustyrpc::{
-    client::Client,
     format::{Decode, Encode, EncodingFormat},
     protocol::{
         PrivateServiceDeallocateRequestResult, RequestKind, ServiceCallRequestError,
@@ -9,7 +8,7 @@ use rustyrpc::{
     },
     server::PrivateServiceAllocator,
     service::{IntoService, Service, ServiceClient, ServiceMetadata, ServiceWrapper},
-    transport,
+    transport, Client,
 };
 
 const SERVICE_NAME: &str = "Hello";

@@ -47,8 +47,7 @@
 
 extern crate alloc;
 
-/// Provides functionality for client side of RPC.
-pub mod client;
+mod client;
 /// Provides abstraction layer against encoding format.
 pub mod format;
 /// Provides core primitives for RPC protocol.
@@ -60,3 +59,6 @@ pub mod service;
 /// Provides abstraction layer against transport.
 pub mod transport;
 mod utils;
+
+pub use client::Client;
+pub use server::Server;

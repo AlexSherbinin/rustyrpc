@@ -6,10 +6,9 @@ use common::{auth_service::AuthServiceClient, hello_service::HelloServiceClient}
 use log::{error, info};
 use quinn::ClientConfig;
 use rustyrpc::{
-    client::Client,
     format::{Decode, Encode, EncodingFormat},
     protocol::{PrivateServiceDeallocateRequestResult, RequestKind, ServiceCallRequestResult},
-    transport,
+    transport, Client,
 };
 
 fn parse_args() -> (String, String) {
