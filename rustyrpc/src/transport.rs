@@ -1,4 +1,7 @@
-use crate::format::{Decode, Encode, EncodingFormat};
+use crate::{
+    format::{Decode, Encode, EncodingFormat},
+    multipart::MultipartSendable,
+};
 use core::future::Future;
 use extension_traits::extension;
 use std::io;
@@ -10,8 +13,23 @@ pub mod quic;
 pub trait Stream: Send {
     /// Send a message on the stream.
     fn send(&mut self, message: Vec<u8>) -> impl Future<Output = io::Result<()>> + Send;
+    /// Send a message on the stream but not put length prefix if it can be satisfied by transport.
+    fn send_not_prefixed(
+        &mut self,
+        message: Vec<u8>,
+    ) -> impl Future<Output = io::Result<()>> + Send;
+    /// Send multipart message
+    fn send_multipart(
+        &mut self,
+        multipart: &MultipartSendable,
+    ) -> impl Future<Output = io::Result<()>> + Send;
     /// Receive a message from stream.
     fn receive(&mut self) -> impl Future<Output = io::Result<Vec<u8>>> + Send;
+    /// Receive a message from stream that possible has no length prefix
+    fn receive_not_prefixed(
+        &mut self,
+        buffer: &mut [u8],
+    ) -> impl Future<Output = io::Result<()>> + Send;
     /// Flush buffered data.
     fn flush(&mut self) -> impl Future<Output = io::Result<()>> + Send;
 }

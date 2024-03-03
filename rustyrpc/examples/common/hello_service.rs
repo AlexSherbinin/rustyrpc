@@ -1,7 +1,11 @@
 use std::{borrow::Cow, future::Future, io, marker::PhantomData, sync::Arc};
 
 use rustyrpc::{
-    format::{Decode, Encode, EncodingFormat},
+    format::{
+        Decode, DecodeZeroCopy, DecodeZeroCopyFallible, Encode, EncodingFormat,
+        ZeroCopyEncodingFormat,
+    },
+    multipart::{MultipartReceived, MultipartSendable},
     protocol::{
         PrivateServiceDeallocateRequestResult, RequestKind, ServiceCallRequestError,
         ServiceCallRequestResult, ServiceKind,
@@ -56,24 +60,33 @@ where
         &self,
         _service_allocator: Arc<PrivateServiceAllocator<Format>>,
         function_id: u32,
-        _args: Vec<u8>,
-    ) -> Result<Vec<u8>, ServiceCallRequestError> {
+        _args: MultipartReceived,
+    ) -> Result<MultipartSendable, ServiceCallRequestError> {
         if function_id != 0 {
             return Err(ServiceCallRequestError::InvalidFunctionId);
         }
 
-        self.0
+        let message = self
+            .0
             .hello()
             .await
             .encode()
-            .map_err(|_| ServiceCallRequestError::ServerInternal)
+            .map_err(|_| ServiceCallRequestError::ServerInternal)?;
+
+        Ok(MultipartSendable::from([message]))
     }
 }
 
-pub struct HelloServiceClient<Connection: transport::ClientConnection, Format: EncodingFormat>
-where
+pub struct HelloServiceClient<
+    Connection: transport::ClientConnection,
+    Format: ZeroCopyEncodingFormat,
+> where
     for<'a> RequestKind<'a>: Encode<Format>,
-    ServiceCallRequestResult: Decode<Format>,
+    for<'a> ServiceCallRequestResult<'a>: DecodeZeroCopy<
+        'a,
+        Format,
+        <ServiceCallRequestResult<'a> as DecodeZeroCopyFallible<Format>>::Error,
+    >,
     PrivateServiceDeallocateRequestResult: Decode<Format>,
 {
     service_kind: ServiceKind,
@@ -81,11 +94,15 @@ where
     rpc_client: Arc<Client<Connection, Format>>,
 }
 
-impl<Connection: transport::ClientConnection, Format: EncodingFormat>
+impl<Connection: transport::ClientConnection, Format: ZeroCopyEncodingFormat>
     ServiceClient<Connection, Format> for HelloServiceClient<Connection, Format>
 where
     for<'a> RequestKind<'a>: Encode<Format>,
-    ServiceCallRequestResult: Decode<Format>,
+    for<'a> ServiceCallRequestResult<'a>: DecodeZeroCopy<
+        'a,
+        Format,
+        <ServiceCallRequestResult<'a> as DecodeZeroCopyFallible<Format>>::Error,
+    >,
     PrivateServiceDeallocateRequestResult: Decode<Format>,
 {
     const SERVICE_NAME: &'static str = SERVICE_NAME;
@@ -104,11 +121,15 @@ where
     }
 }
 
-impl<Connection: transport::ClientConnection, Format: EncodingFormat>
+impl<Connection: transport::ClientConnection, Format: ZeroCopyEncodingFormat>
     HelloServiceClient<Connection, Format>
 where
     for<'a> RequestKind<'a>: Encode<Format>,
-    ServiceCallRequestResult: Decode<Format>,
+    for<'a> ServiceCallRequestResult<'a>: DecodeZeroCopy<
+        'a,
+        Format,
+        <ServiceCallRequestResult<'a> as DecodeZeroCopyFallible<Format>>::Error,
+    >,
     PrivateServiceDeallocateRequestResult: Decode<Format>,
 {
     pub async fn hello(&self) -> io::Result<String>
@@ -127,11 +148,15 @@ where
     }
 }
 
-impl<Connection: transport::ClientConnection, Format: EncodingFormat> Drop
+impl<Connection: transport::ClientConnection, Format: ZeroCopyEncodingFormat> Drop
     for HelloServiceClient<Connection, Format>
 where
     for<'a> RequestKind<'a>: Encode<Format>,
-    ServiceCallRequestResult: Decode<Format>,
+    for<'a> ServiceCallRequestResult<'a>: DecodeZeroCopy<
+        'a,
+        Format,
+        <ServiceCallRequestResult<'a> as DecodeZeroCopyFallible<Format>>::Error,
+    >,
     PrivateServiceDeallocateRequestResult: Decode<Format>,
 {
     fn drop(&mut self) {

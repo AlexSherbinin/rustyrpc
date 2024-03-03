@@ -19,7 +19,7 @@ use thiserror::Error;
 /// Response on service id request
 pub type ServiceIdRequestResult = Result<ServiceFound, RemoteServiceIdRequestError>;
 /// Response on service call request
-pub type ServiceCallRequestResult = Result<(), ServiceCallRequestError>;
+pub type ServiceCallRequestResult<'a> = Result<&'a [u32], ServiceCallRequestError>;
 /// Response on private service deallocation request
 pub type PrivateServiceDeallocateRequestResult = Result<(), InvalidPrivateServiceIdError>;
 
@@ -40,6 +40,8 @@ pub enum RequestKind<'a> {
         id: u32,
         /// Service's function id
         function_id: u32,
+        /// Length of each part of multipart sent as function arguments
+        part_sizes: &'a [u32],
     },
     /// Request to deallocate private service
     DeallocatePrivateService {

@@ -5,6 +5,7 @@ use async_trait::async_trait;
 use crate::{
     client::Client,
     format::EncodingFormat,
+    multipart::{MultipartReceived, MultipartSendable},
     protocol::{ServiceCallRequestError, ServiceKind},
     server::PrivateServiceAllocator,
     transport,
@@ -53,8 +54,8 @@ pub trait Service<Format: EncodingFormat>: Send + Sync {
         &self,
         service_allocator: Arc<PrivateServiceAllocator<Format>>,
         function_id: u32,
-        args: Vec<u8>,
-    ) -> Result<Vec<u8>, ServiceCallRequestError>;
+        args: MultipartReceived,
+    ) -> Result<MultipartSendable, ServiceCallRequestError>;
 }
 
 /// An implementor of specific service trait that can be converted to [`Service`] with specified wrapper.

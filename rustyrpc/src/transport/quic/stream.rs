@@ -5,7 +5,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader, BufWriter};
 
 use thiserror::Error;
 
-use crate::transport;
+use crate::{multipart::MultipartSendable, transport};
 
 /// Stream via QUIC protocol.
 pub struct Stream {
@@ -36,6 +36,15 @@ impl transport::Stream for Stream {
         Ok(())
     }
 
+    async fn send_not_prefixed(&mut self, message: Vec<u8>) -> io::Result<()> {
+        self.send_stream.write_all(&message).await?;
+        Ok(())
+    }
+
+    async fn send_multipart(&mut self, multipart: &MultipartSendable) -> io::Result<()> {
+        self.send_stream.write_vectored(multipart).await.map(|_| ())
+    }
+
     async fn receive(&mut self) -> io::Result<Vec<u8>> {
         let mut length_prefix_buffer = [0u8; 4];
         self.receive_stream
@@ -54,6 +63,10 @@ impl transport::Stream for Stream {
         self.receive_stream.read_exact(&mut message_buffer).await?;
 
         Ok(message_buffer)
+    }
+
+    async fn receive_not_prefixed(&mut self, buffer: &mut [u8]) -> io::Result<()> {
+        self.receive_stream.read_exact(buffer).await.map(|_| ())
     }
 
     async fn flush(&mut self) -> io::Result<()> {

@@ -5,7 +5,8 @@ use std::io;
 use tokio::sync::Mutex;
 
 use crate::{
-    format::{self, Decode, Encode, EncodingFormat},
+    format::{self, Decode, DecodeZeroCopy, DecodeZeroCopyFallible, Encode, EncodingFormat},
+    multipart::{MultipartReceived, MultipartSendable},
     protocol::{
         PrivateServiceDeallocateRequestResult, RequestKind, ServiceCallRequestResult,
         ServiceIdRequestResult, ServiceKind,
@@ -21,12 +22,17 @@ pub struct Client<Connection: transport::ClientConnection, Format: format::Encod
     _format: PhantomData<Format>,
 }
 
-impl<Connection: transport::ClientConnection, Format: format::EncodingFormat>
+impl<Connection: transport::ClientConnection, Format: format::ZeroCopyEncodingFormat>
     Client<Connection, Format>
 where
     for<'a> RequestKind<'a>: Encode<Format>,
+    for<'a> ServiceCallRequestResult<'a>: DecodeZeroCopy<
+        'a,
+        Format,
+        <ServiceCallRequestResult<'a> as DecodeZeroCopyFallible<Format>>::Error,
+    >,
 {
-    async fn open_new_stream(&self) -> io::Result<Connection::Stream> {
+    async fn new_stream(&self) -> io::Result<Connection::Stream> {
         let mut transport_connection = self.connection.lock().await;
         transport_connection.deref_mut().0.new_stream().await
     }
@@ -58,7 +64,7 @@ where
     where
         ServiceIdRequestResult: Decode<Format>,
     {
-        let mut request_stream = self.open_new_stream().await?;
+        let mut request_stream = self.new_stream().await?;
 
         let request = RequestKind::ServiceId { name, checksum };
         request_stream.send_encodable(&request).await?;
@@ -68,6 +74,40 @@ where
             .receive_decodable::<ServiceIdRequestResult, _>()
             .await??;
         Ok(service_id.0)
+    }
+
+    /// Call a remote service with multipart as arguments.
+    /// # Errors
+    /// Returns an error if service call fails.
+    pub async fn call_service_multipart(
+        &self,
+        kind: ServiceKind,
+        id: u32,
+        function_id: u32,
+        args: &MultipartSendable,
+    ) -> io::Result<MultipartReceived> {
+        let mut request_stream = self.new_stream().await?;
+
+        let part_sizes: Vec<u32> = args
+            .iter()
+            .map(|part| part.len().try_into())
+            .try_collect()
+            .map_err(|err| io::Error::new(io::ErrorKind::InvalidInput, err))?;
+
+        let request = RequestKind::ServiceCall {
+            kind,
+            id,
+            function_id,
+            part_sizes: &part_sizes,
+        };
+        request_stream.send_encodable(&request).await?;
+        request_stream.send_multipart(args).await?;
+        request_stream.flush().await?;
+
+        let service_call_result = request_stream.receive().await?;
+        let response_part_sizes = ServiceCallRequestResult::decode_zero_copy(&service_call_result)
+            .map_err(|err| io::Error::new(io::ErrorKind::Other, err))??;
+        MultipartReceived::receive_from_stream(&mut request_stream, response_part_sizes).await
     }
 
     /// Calls a remote service.
@@ -84,25 +124,23 @@ where
     where
         Args: Encode<Format>,
         Returns: Decode<Format>,
-        ServiceCallRequestResult: Decode<Format>,
     {
-        let mut request_stream = self.open_new_stream().await?;
+        let args_encoded = args
+            .encode()
+            .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))?;
+        let request_multipart = MultipartSendable::from([args_encoded]);
 
-        let request = RequestKind::ServiceCall {
-            kind,
-            id,
-            function_id,
-        };
-        request_stream.send_encodable(&request).await?;
-        request_stream.send_encodable(args).await?;
-        request_stream.flush().await?;
+        let response_multipart = self
+            .call_service_multipart(kind, id, function_id, &request_multipart)
+            .await?;
 
-        request_stream
-            .receive_decodable::<ServiceCallRequestResult, _>()
-            .await??;
-
-        let result = request_stream.receive_decodable().await?;
-        Ok(result)
+        let response = response_multipart.iter().next().ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::Other,
+                "Server sent no multipart when expected at least one",
+            )
+        })?;
+        Returns::decode(response).map_err(|err| io::Error::new(io::ErrorKind::Other, err))
     }
 
     /// Deallocate private service previously returned from public service.
@@ -113,7 +151,7 @@ where
     where
         PrivateServiceDeallocateRequestResult: Decode<Format>,
     {
-        let mut request_stream = self.open_new_stream().await?;
+        let mut request_stream = self.new_stream().await?;
 
         let request = RequestKind::DeallocatePrivateService { id };
         request_stream.send_encodable(&request).await?;

@@ -23,6 +23,8 @@ pub enum RequestKind<'a> {
         kind: ServiceKind,
         id: u32,
         function_id: u32,
+        #[with(RefAsBox)]
+        part_sizes: &'a [u32],
     },
     DeallocatePrivateService {
         id: u32,
@@ -41,10 +43,12 @@ impl<'a> From<&protocol::RequestKind<'a>> for RequestKind<'a> {
                 kind,
                 id,
                 function_id,
+                part_sizes,
             } => Self::ServiceCall {
                 kind: (*kind).into(),
                 id: *id,
                 function_id: *function_id,
+                part_sizes,
             },
             protocol::RequestKind::DeallocatePrivateService { id } => {
                 Self::DeallocatePrivateService { id: *id }
@@ -61,10 +65,12 @@ impl<'a> From<&'a ArchivedRequestKind<'a>> for protocol::RequestKind<'a> {
                 kind,
                 id,
                 function_id,
+                part_sizes,
             } => Self::ServiceCall {
                 kind: kind.into(),
                 id: *id,
                 function_id: *function_id,
+                part_sizes,
             },
             ArchivedRequestKind::DeallocatePrivateService { id } => {
                 Self::DeallocatePrivateService { id: *id }

@@ -43,9 +43,8 @@ where
     for<'a, 'b> RequestKind<'a>:
         DecodeZeroCopy<'a, Format, <RequestKind<'b> as DecodeZeroCopyFallible<Format>>::Error>,
     ServiceIdRequestResult: Encode<Format>,
-    ServiceCallRequestResult: Encode<Format>,
+    for<'a> ServiceCallRequestResult<'a>: Encode<Format>,
     PrivateServiceDeallocateRequestResult: Encode<Format>,
-    u32: Encode<Format>,
 {
     /// Starts listening for incoming connections and handles them.
     #[allow(clippy::unwrap_used, clippy::missing_panics_doc)]

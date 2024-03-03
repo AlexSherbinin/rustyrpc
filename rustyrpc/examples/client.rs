@@ -6,7 +6,10 @@ use common::{auth_service::AuthServiceClient, hello_service::HelloServiceClient}
 use log::{error, info};
 use quinn::ClientConfig;
 use rustyrpc::{
-    format::{Decode, Encode, EncodingFormat},
+    format::{
+        Decode, DecodeZeroCopy, DecodeZeroCopyFallible, Encode, EncodingFormat,
+        ZeroCopyEncodingFormat,
+    },
     protocol::{PrivateServiceDeallocateRequestResult, RequestKind, ServiceCallRequestResult},
     transport, Client,
 };
@@ -50,11 +53,18 @@ async fn main() {
     tokio::time::sleep(Duration::from_secs(2)).await; // Waiting to allow HelloService deallocation request to be sent.
 }
 
-async fn start_healthcheck<Connection: transport::ClientConnection, Format: EncodingFormat>(
+async fn start_healthcheck<
+    Connection: transport::ClientConnection,
+    Format: ZeroCopyEncodingFormat,
+>(
     hello_service_client: HelloServiceClient<Connection, Format>,
 ) where
     for<'a> RequestKind<'a>: Encode<Format>,
-    ServiceCallRequestResult: Decode<Format>,
+    for<'a> ServiceCallRequestResult<'a>: DecodeZeroCopy<
+        'a,
+        Format,
+        <ServiceCallRequestResult<'a> as DecodeZeroCopyFallible<Format>>::Error,
+    >,
     PrivateServiceDeallocateRequestResult: Decode<Format>,
     (): Encode<Format>,
     String: Decode<Format>,

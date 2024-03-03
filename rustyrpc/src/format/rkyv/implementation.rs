@@ -17,7 +17,7 @@ auto trait DefaultEncode {}
 #[allow(suspicious_auto_trait_impls)]
 impl !DefaultEncode for protocol::ServiceIdRequestResult {}
 #[allow(suspicious_auto_trait_impls)]
-impl !DefaultEncode for protocol::ServiceCallRequestResult {}
+impl<'a> !DefaultEncode for protocol::ServiceCallRequestResult<'a> {}
 #[allow(suspicious_auto_trait_impls)]
 impl !DefaultEncode for protocol::PrivateServiceDeallocateRequestResult {}
 #[allow(suspicious_auto_trait_impls)]

@@ -1,6 +1,7 @@
 use super::{call_stream::CallHandler, PrivateServiceAllocator, Server};
 use crate::{
     format::EncodingFormat,
+    multipart::{MultipartReceived, MultipartSendable},
     protocol::{
         InvalidPrivateServiceIdError, RemoteServiceIdRequestError, ServiceCallRequestError,
         ServiceKind,
@@ -33,8 +34,8 @@ impl<Listener: transport::ConnectionListener, Format: EncodingFormat>
         self,
         service: super::private_service::ServiceRefLock<'_, Format>,
         function_id: u32,
-        args: Vec<u8>,
-    ) -> Result<Vec<u8>, ServiceCallRequestError> {
+        args: MultipartReceived,
+    ) -> Result<MultipartSendable, ServiceCallRequestError> {
         service
             .call(
                 Arc::clone(&self.private_service_allocator),
@@ -48,8 +49,8 @@ impl<Listener: transport::ConnectionListener, Format: EncodingFormat>
         self,
         service: &dyn Service<Format>,
         function_id: u32,
-        args: Vec<u8>,
-    ) -> Result<Vec<u8>, ServiceCallRequestError> {
+        args: MultipartReceived,
+    ) -> Result<MultipartSendable, ServiceCallRequestError> {
         service
             .call(
                 Arc::clone(&self.private_service_allocator),
@@ -68,8 +69,8 @@ impl<Listener: transport::ConnectionListener, Format: EncodingFormat> CallHandle
         kind: ServiceKind,
         service_id: u32,
         function_id: u32,
-        args: Vec<u8>,
-    ) -> Result<Vec<u8>, ServiceCallRequestError> {
+        args: MultipartReceived,
+    ) -> Result<MultipartSendable, ServiceCallRequestError> {
         trace!("Received service call. Kind: {kind:?}, service id: {service_id}, function_id: {function_id}");
 
         #[allow(clippy::map_err_ignore)]

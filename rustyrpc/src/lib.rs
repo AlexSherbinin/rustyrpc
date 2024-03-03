@@ -6,7 +6,8 @@
     auto_traits,
     negative_impls,
     if_let_guard,
-    let_chains
+    let_chains,
+    iterator_try_collect
 )]
 #![deny(
     warnings,
@@ -50,6 +51,8 @@ extern crate alloc;
 mod client;
 /// Provides abstraction layer against encoding format.
 pub mod format;
+/// Provides primitives for working with multipart in calls.
+pub mod multipart;
 /// Provides core primitives for RPC protocol.
 pub mod protocol;
 /// Provides functionality for server side of RPC.

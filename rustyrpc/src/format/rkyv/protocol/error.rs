@@ -36,13 +36,13 @@ pub enum ServiceCallRequestError {
     ReturnsDecode,
 }
 
-impl From<ServiceCallRequestError> for protocol::ServiceCallRequestError {
-    fn from(error: ServiceCallRequestError) -> Self {
+impl From<&ArchivedServiceCallRequestError> for protocol::ServiceCallRequestError {
+    fn from(error: &ArchivedServiceCallRequestError) -> Self {
         match error {
-            ServiceCallRequestError::InvalidServiceId => Self::InvalidServiceId,
-            ServiceCallRequestError::InvalidFunctionId => Self::InvalidFunctionId,
-            ServiceCallRequestError::ArgsDecode => Self::ArgsDecode,
-            ServiceCallRequestError::ReturnsDecode => Self::ServerInternal,
+            ArchivedServiceCallRequestError::InvalidServiceId => Self::InvalidServiceId,
+            ArchivedServiceCallRequestError::InvalidFunctionId => Self::InvalidFunctionId,
+            ArchivedServiceCallRequestError::ArgsDecode => Self::ArgsDecode,
+            ArchivedServiceCallRequestError::ReturnsDecode => Self::ServerInternal,
         }
     }
 }

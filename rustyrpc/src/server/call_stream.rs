@@ -2,6 +2,7 @@ use crate::{
     format::{
         DecodeZeroCopy, DecodeZeroCopyFallible, Encode, EncodingFormat, ZeroCopyEncodingFormat,
     },
+    multipart::{MultipartReceived, MultipartSendable},
     protocol::{
         InvalidPrivateServiceIdError, PrivateServiceDeallocateRequestResult,
         RemoteServiceIdRequestError, RequestKind, ServiceCallRequestError,
@@ -18,8 +19,8 @@ pub(crate) trait CallHandler {
         kind: ServiceKind,
         service_id: u32,
         function_id: u32,
-        args: Vec<u8>,
-    ) -> impl Future<Output = Result<Vec<u8>, ServiceCallRequestError>> + Send;
+        args: MultipartReceived,
+    ) -> impl Future<Output = Result<MultipartSendable, ServiceCallRequestError>> + Send;
 
     fn handle_service_request(
         &self,
@@ -43,7 +44,7 @@ where
     for<'b, 'c> RequestKind<'b>:
         DecodeZeroCopy<'b, Format, <RequestKind<'c> as DecodeZeroCopyFallible<Format>>::Error>,
     ServiceIdRequestResult: Encode<Format>,
-    ServiceCallRequestResult: Encode<Format>,
+    for<'a> ServiceCallRequestResult<'a>: Encode<Format>,
     PrivateServiceDeallocateRequestResult: Encode<Format>,
 {
     pub(crate) async fn handle_call<H>(mut self, handler: &H) -> io::Result<()>
@@ -53,7 +54,7 @@ where
         loop {
             let request = self.stream.receive().await?;
             let request = RequestKind::decode_zero_copy(&request)
-                .map_err(|err| io::Error::new(io::ErrorKind::InvalidInput, err))?;
+                .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
 
             match request {
                 RequestKind::ServiceId { name, checksum } => {
@@ -64,8 +65,10 @@ where
                     kind,
                     id,
                     function_id,
+                    part_sizes,
                 } => {
-                    let args = self.stream.receive().await?;
+                    let args = MultipartReceived::receive_from_stream(&mut self.stream, part_sizes)
+                        .await?;
 
                     self.handle_service_call_request(handler, kind, id, function_id, args)
                         .await?;
@@ -100,20 +103,26 @@ where
         kind: ServiceKind,
         service_id: u32,
         function_id: u32,
-        args: Vec<u8>,
-    ) -> io::Result<()>
-    where
-        ServiceCallRequestResult: Encode<Format>,
-    {
+        args: MultipartReceived,
+    ) -> io::Result<()> {
         match handler
             .handle_call(kind, service_id, function_id, args)
             .await
         {
             Ok(returns) => {
+                let part_sizes: Vec<u32> = returns
+                    .iter()
+                    .map(|part| {
+                        part.len()
+                            .try_into()
+                            .map_err(|err| io::Error::new(io::ErrorKind::Other, err))
+                    })
+                    .try_collect()?;
+
                 self.stream
-                    .send_encodable::<ServiceCallRequestResult, _>(&Ok(()))
+                    .send_encodable::<ServiceCallRequestResult, _>(&Ok(&part_sizes))
                     .await?;
-                self.stream.send(returns).await?;
+                self.stream.send_multipart(&returns).await?;
             }
             Err(err) => {
                 self.stream

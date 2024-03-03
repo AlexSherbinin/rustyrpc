@@ -4,7 +4,11 @@ use async_trait::async_trait;
 use derive_where::derive_where;
 use rkyv::{with::RefAsBox, Archive, Serialize};
 use rustyrpc::{
-    format::{Decode, Encode, EncodingFormat},
+    format::{
+        Decode, DecodeZeroCopy, DecodeZeroCopyFallible, Encode, EncodingFormat,
+        ZeroCopyEncodingFormat,
+    },
+    multipart::{MultipartReceived, MultipartSendable},
     protocol::{
         PrivateServiceDeallocateRequestResult, RequestKind, ServiceCallRequestError,
         ServiceCallRequestResult, ServiceKind,
@@ -80,8 +84,8 @@ where
         &self,
         service_allocator: Arc<PrivateServiceAllocator<Format>>,
         function_id: u32,
-        args: Vec<u8>,
-    ) -> Result<Vec<u8>, ServiceCallRequestError> {
+        args: MultipartReceived,
+    ) -> Result<MultipartSendable, ServiceCallRequestError> {
         if function_id != 0 {
             return Err(ServiceCallRequestError::InvalidFunctionId);
         }
@@ -96,9 +100,11 @@ where
             None
         };
 
-        service_ref
+        let hello_service_ref = service_ref
             .encode()
-            .map_err(|_| ServiceCallRequestError::ServerInternal)
+            .map_err(|_| ServiceCallRequestError::ServerInternal)?;
+
+        Ok(MultipartSendable::from([hello_service_ref]))
     }
 }
 
@@ -109,11 +115,15 @@ pub struct AuthServiceClient<Connection: transport::ClientConnection, Format: En
     rpc_client: Arc<Client<Connection, Format>>,
 }
 
-impl<Connection: transport::ClientConnection, Format: EncodingFormat>
+impl<Connection: transport::ClientConnection, Format: ZeroCopyEncodingFormat>
     AuthServiceClient<Connection, Format>
 where
     for<'a> RequestKind<'a>: Encode<Format>,
-    ServiceCallRequestResult: Decode<Format>,
+    for<'a> ServiceCallRequestResult<'a>: DecodeZeroCopy<
+        'a,
+        Format,
+        <ServiceCallRequestResult<'a> as DecodeZeroCopyFallible<Format>>::Error,
+    >,
     PrivateServiceDeallocateRequestResult: Decode<Format>,
 {
     pub async fn auth(

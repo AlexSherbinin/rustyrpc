@@ -9,7 +9,10 @@ use std::io;
 use quinn::ConnectionError;
 use tokio::sync::{Semaphore, TryAcquireError};
 
-use crate::transport::{self, quic::stream::Stream};
+use crate::{
+    multipart::MultipartSendable,
+    transport::{self, quic::stream::Stream},
+};
 
 pub struct PooledStream {
     inner: MaybeUninit<Stream>,
@@ -44,8 +47,17 @@ impl transport::Stream for PooledStream {
     async fn send(&mut self, message: Vec<u8>) -> io::Result<()> {
         self.deref_mut().send(message).await
     }
+    async fn send_not_prefixed(&mut self, message: Vec<u8>) -> io::Result<()> {
+        self.deref_mut().send_not_prefixed(message).await
+    }
+    async fn send_multipart(&mut self, multipart: &MultipartSendable) -> io::Result<()> {
+        self.deref_mut().send_multipart(multipart).await
+    }
     async fn receive(&mut self) -> io::Result<Vec<u8>> {
         self.deref_mut().receive().await
+    }
+    async fn receive_not_prefixed(&mut self, buffer: &mut [u8]) -> io::Result<()> {
+        self.deref_mut().receive_not_prefixed(buffer).await
     }
     async fn flush(&mut self) -> io::Result<()> {
         self.deref_mut().flush().await
